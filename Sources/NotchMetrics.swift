@@ -37,18 +37,24 @@ struct NotchMetrics {
                             isRealNotch: false)
     }
 
-    /// The exact hover target: the physical notch, only lightly padded so the
-    /// panel doesn't open when the cursor is merely near the top of the screen.
-    var collapsedSize: CGSize {
-        CGSize(width: max(notchWidth, 120), height: max(notchHeight, 26))
+    var barHeight: CGFloat { max(notchHeight, 26) }
+
+    /// How far the black "chin" extends past each side of the physical notch when
+    /// a Now Playing activity is shown — room for album art on the left and the
+    /// visualizer on the right (same idea as The Boring Notch).
+    var sideChinWidth: CGFloat { max(0, barHeight - 12) + 16 }
+
+    /// Collapsed window size. Just the physical notch normally; widened on both
+    /// sides when media is playing so the live activity has somewhere to draw.
+    func collapsedSize(mediaActive: Bool) -> CGSize {
+        let w = max(notchWidth, 120)
+        return CGSize(width: mediaActive ? w + sideChinWidth * 2 : w, height: barHeight)
     }
 
     /// Window frame (screen coords) centred on the notch, pinned to the top edge.
-    /// The window is only as large as it needs to be so it doesn't swallow clicks
-    /// or scroll gestures elsewhere along the top of the screen.
-    func windowFrame(expanded: Bool) -> NSRect {
+    func windowFrame(expanded: Bool, mediaActive: Bool = false) -> NSRect {
         let f = screen.frame
-        let size = expanded ? expandedSize : collapsedSize
+        let size = expanded ? expandedSize : collapsedSize(mediaActive: mediaActive)
         let x = f.midX - size.width / 2
         let y = f.maxY - size.height
         return NSRect(x: x, y: y, width: size.width, height: size.height)

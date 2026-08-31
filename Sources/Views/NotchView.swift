@@ -6,7 +6,10 @@ struct NotchView: View {
     @ObservedObject var nowPlaying: NowPlayingController
     @ObservedObject var battery: BatteryMonitor
 
-    private var collapsedWidth: CGFloat { max(viewModel.metrics.notchWidth, 180) }
+    private var mediaActive: Bool { nowPlaying.track != nil }
+    private var collapsedWidth: CGFloat {
+        viewModel.metrics.collapsedSize(mediaActive: mediaActive).width
+    }
     private var collapsedHeight: CGFloat { max(viewModel.metrics.notchHeight, 28) }
 
     var body: some View {
@@ -31,6 +34,7 @@ struct NotchView: View {
             .frame(width: viewModel.isExpanded ? viewModel.metrics.expandedSize.width : collapsedWidth,
                    height: viewModel.isExpanded ? viewModel.metrics.expandedSize.height : collapsedHeight)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.isExpanded)
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: mediaActive)
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 handleDrop(providers)
             }
@@ -57,42 +61,39 @@ struct NotchView: View {
 
 // MARK: - Collapsed
 
+/// The closed-notch "live activity": album art on the left of the physical
+/// notch, a visualizer on the right, transparent gap for the notch itself.
+/// (Same layout idea as The Boring Notch.)
 private struct CollapsedContent: View {
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject var nowPlaying: NowPlayingController
     @ObservedObject var battery: BatteryMonitor
 
+    private var notchWidth: CGFloat { max(viewModel.metrics.notchWidth, 120) }
+    private var barHeight: CGFloat { viewModel.metrics.barHeight }
+    private var art: CGFloat { max(0, barHeight - 12) }
+
     var body: some View {
-        HStack(spacing: 6) {
-            if let track = nowPlaying.track {
-                ArtworkView(image: track.artwork, size: 20, corner: 5)
-                EqualizerBars(playing: track.isPlaying,
-                              tint: MediaSource.match(bundleID: track.bundleID)?.tint ?? .white)
-            } else {
-                Image(systemName: "music.note")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-            Spacer(minLength: 4)
-            Text(viewModel.now, format: .dateTime.hour().minute())
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
-                .monospacedDigit()
-            if let s = battery.state {
-                HStack(spacing: 2) {
-                    if nowPlaying.track == nil {
-                        Text("\(s.percent)%")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .monospacedDigit()
-                    }
-                    Image(systemName: s.symbolName)
-                        .font(.system(size: 11))
+        if let track = nowPlaying.track {
+            HStack(spacing: 0) {
+                HStack {
+                    Spacer(minLength: 0)
+                    ArtworkView(image: track.artwork, size: art, corner: 5)
+                        .padding(.trailing, 6)
                 }
-                .foregroundStyle(s.percent <= 20 && !s.isPluggedIn ? .red : .white.opacity(0.7))
-                .symbolEffect(.pulse, isActive: battery.justPluggedIn)
+                Color.clear.frame(width: notchWidth)
+                HStack {
+                    EqualizerBars(playing: track.isPlaying,
+                                  tint: MediaSource.match(bundleID: track.bundleID)?.tint ?? .white)
+                        .padding(.leading, 6)
+                    Spacer(minLength: 0)
+                }
             }
+            .frame(height: barHeight)
+            .transition(.opacity)
+        } else {
+            Color.clear.frame(height: barHeight)
         }
-        .padding(.horizontal, 12)
     }
 }
 

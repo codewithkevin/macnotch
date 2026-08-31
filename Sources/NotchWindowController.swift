@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 /// Owns the borderless floating panel anchored under the notch.
 ///
@@ -15,6 +16,8 @@ final class NotchWindowController {
     private let viewModel = NotchViewModel()
     private let nowPlaying = NowPlayingController()
     private let battery = BatteryMonitor()
+    private var cancellables = Set<AnyCancellable>()
+    private var mediaActive = false
 
     func show() {
         let metrics = NotchMetrics.current()
@@ -22,7 +25,7 @@ final class NotchWindowController {
         nowPlaying.start()
         battery.start()
 
-        let panel = NotchPanel(contentRect: metrics.windowFrame(expanded: true))
+        let panel = NotchPanel(contentRect: metrics.windowFrame(expanded: false))
 
         let interaction = NotchInteractionView()
         interaction.frame = panel.contentLayoutRect
@@ -52,10 +55,37 @@ final class NotchWindowController {
         self.panel = panel
         self.interaction = interaction
 
-        // Keep the interaction view's notion of "expanded" in sync so its
-        // tracking rect matches what the user actually sees.
-        viewModel.onExpandedChange = { [weak interaction] expanded in
-            interaction?.isExpanded = expanded
+        viewModel.onExpandedChange = { [weak self] expanded in
+            self?.interaction?.isExpanded = expanded
+            self?.applyFrame(animated: true)
+        }
+
+        // Widen the collapsed notch when something is playing so the album art
+        // and visualizer have room beside the physical notch.
+        nowPlaying.$track
+            .map { $0 != nil }
+            .removeDuplicates()
+            .sink { [weak self] active in
+                guard let self else { return }
+                self.mediaActive = active
+                self.interaction?.mediaActive = active
+                self.applyFrame(animated: true)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyFrame(animated: Bool) {
+        let frame = viewModel.metrics.windowFrame(expanded: viewModel.isExpanded,
+                                                  mediaActive: mediaActive)
+        guard let panel, panel.frame != frame else { return }
+        if animated {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.3
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(frame, display: true)
+            }
+        } else {
+            panel.setFrame(frame, display: true)
         }
     }
 
@@ -63,7 +93,7 @@ final class NotchWindowController {
         let metrics = NotchMetrics.current()
         viewModel.metrics = metrics
         interaction?.metrics = metrics
-        panel?.setFrame(metrics.windowFrame(expanded: true), display: true, animate: false)
+        applyFrame(animated: false)
     }
 }
 
@@ -100,6 +130,7 @@ final class NotchPanel: NSPanel {
 final class NotchInteractionView: NSView {
     var metrics: NotchMetrics? { didSet { refreshTracking() } }
     var isExpanded = false { didSet { if isExpanded != oldValue { refreshTracking() } } }
+    var mediaActive = false { didSet { if mediaActive != oldValue { refreshTracking() } } }
     var onHoverChange: ((Bool) -> Void)?
     var onScroll: ((CGFloat) -> Void)?
 
@@ -120,7 +151,7 @@ final class NotchInteractionView: NSView {
     /// Collapsed: just the notch. Expanded: the whole (now panel-sized) window.
     private var hotRect: NSRect {
         guard let metrics, !isExpanded else { return bounds }
-        let size = metrics.collapsedSize
+        let size = metrics.collapsedSize(mediaActive: mediaActive)
         return NSRect(x: (bounds.width - size.width) / 2,
                       y: 0,
                       width: size.width,
