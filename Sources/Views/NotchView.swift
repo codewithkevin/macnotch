@@ -30,10 +30,7 @@ struct NotchView: View {
             }
             .frame(width: viewModel.isExpanded ? viewModel.metrics.expandedSize.width : collapsedWidth,
                    height: viewModel.isExpanded ? viewModel.metrics.expandedSize.height : collapsedHeight)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                viewModel.setExpanded(hovering)
-            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.isExpanded)
             .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                 handleDrop(providers)
             }
@@ -41,6 +38,7 @@ struct NotchView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(viewModel.isExpanded)
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

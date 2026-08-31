@@ -4,7 +4,12 @@ import Combine
 @MainActor
 final class NotchViewModel: ObservableObject {
     @Published var metrics: NotchMetrics = .current()
-    @Published var isExpanded: Bool = false
+    @Published var isExpanded: Bool = false {
+        didSet { if isExpanded != oldValue { onExpandedChange?(isExpanded) } }
+    }
+
+    /// Notifies the AppKit interaction layer so its tracking rect stays in sync.
+    var onExpandedChange: ((Bool) -> Void)?
     @Published var now: Date = Date()
     /// File URLs dropped onto the shelf.
     @Published var shelfItems: [URL] = [] {
