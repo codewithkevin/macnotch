@@ -110,31 +110,46 @@ final class NowPlayingController: ObservableObject {
 
     // MARK: - Ingest
 
+    /// The adapter streams **diff** updates: after the first full snapshot, most
+    /// messages carry only the fields that changed. So we merge into the current
+    /// track rather than rebuilding it (which would blank the title / reset
+    /// `isPlaying` on every partial update). `nil` means playback fully stopped.
     private func ingest(_ info: TrackInfo?) {
-        guard let payload = info?.payload, let title = payload.title, !title.isEmpty else {
+        guard let payload = info?.payload else {
             track = nil
             elapsed = 0
             return
         }
 
-        let duration = (payload.durationMicros ?? 0) / 1_000_000
-        track = Track(
-            title: title,
-            artist: payload.artist ?? "",
-            album: payload.album ?? "",
-            appName: payload.applicationName ?? "",
-            bundleID: payload.bundleIdentifier ?? "",
-            isPlaying: payload.isPlaying ?? false,
-            duration: duration,
-            artwork: payload.artwork
-        )
+        var t = track ?? Track(title: "", artist: "", album: "", appName: "",
+                               bundleID: "", isPlaying: false, duration: 0, artwork: nil)
+
+        if let v = payload.title { t.title = v }
+        if let v = payload.artist { t.artist = v }
+        if let v = payload.album { t.album = v }
+        if let v = payload.applicationName { t.appName = v }
+        if let v = payload.bundleIdentifier { t.bundleID = v }
+        if let v = payload.isPlaying { t.isPlaying = v }
+        else if let rate = payload.playbackRate { t.isPlaying = rate > 0 }
+        if let micros = payload.durationMicros { t.duration = micros / 1_000_000 }
+        if let art = payload.artwork { t.artwork = art }
+
+        guard !t.title.isEmpty else {
+            track = nil
+            elapsed = 0
+            return
+        }
+        track = t
 
         if let s = payload.shuffleMode { shuffle = s }
         if let r = payload.repeatMode { repeatMode = r }
 
-        anchorElapsed = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 } ?? 0
-        anchorDate = .now
-        elapsed = anchorElapsed
+        if let position = payload.currentElapsedTime
+            ?? payload.elapsedTimeMicros.map({ $0 / 1_000_000 }) {
+            anchorElapsed = position
+            anchorDate = .now
+            elapsed = position
+        }
     }
 
     private func tick() {
