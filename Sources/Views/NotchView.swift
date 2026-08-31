@@ -100,7 +100,7 @@ private struct CollapsedContent: View {
 /// A small animated equalizer — the "music is playing" indicator on the
 /// collapsed notch. Bars are procedural (MediaRemote doesn't expose levels) and
 /// the timeline pauses itself when the view isn't shown.
-private struct EqualizerBars: View {
+struct EqualizerBars: View {
     var playing: Bool
     var tint: Color = .white
     private let count = 4
@@ -133,66 +133,12 @@ private struct ExpandedContent: View {
     @ObservedObject var nowPlaying: NowPlayingController
     @ObservedObject var battery: BatteryMonitor
 
-    @State private var page = 0
-    @GestureState private var drag: CGFloat = 0
-
-    private var pageCount: Int { battery.state != nil ? 3 : 2 }
-
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-
-            HStack(spacing: 0) {
-                mediaOrClock.frame(width: w)
-                if battery.state != nil {
-                    BatteryCard(battery: battery).frame(width: w)
-                }
-                DashboardPage(viewModel: viewModel, battery: battery).frame(width: w)
-            }
-            .offset(x: -CGFloat(page) * w + drag)
-            .frame(width: w, alignment: .leading)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 12)
-                    .updating($drag) { value, state, _ in state = value.translation.width }
-                    .onEnded { value in
-                        let threshold = w / 4
-                        var next = page
-                        if value.translation.width < -threshold { next += 1 }
-                        else if value.translation.width > threshold { next -= 1 }
-                        page = min(max(next, 0), pageCount - 1)
-                    }
-            )
-            .overlay(alignment: .bottom) {
-                if pageCount > 1 {
-                    HStack(spacing: 5) {
-                        ForEach(0..<pageCount, id: \.self) { i in
-                            Circle()
-                                .fill(.white.opacity(i == page ? 0.9 : 0.28))
-                                .frame(width: 5, height: 5)
-                                .onTapGesture { withAnimation(.spring(response: 0.3)) { page = i } }
-                        }
-                    }
-                }
-            }
-            .animation(.spring(response: 0.32, dampingFraction: 0.85), value: page)
-            .animation(.interactiveSpring(), value: drag)
-        }
-        .onChange(of: viewModel.isExpanded) { _, expanded in
-            if !expanded { page = 0 }
-        }
-    }
-
-    @ViewBuilder private var mediaOrClock: some View {
-        if nowPlaying.hasMedia {
-            MediaPlayerView(nowPlaying: nowPlaying)
-        } else {
-            ClockView(now: viewModel.now)
-        }
+        DashboardPage(viewModel: viewModel, nowPlaying: nowPlaying, battery: battery)
     }
 }
 
-private struct BatteryCard: View {
+struct BatteryCard: View {
     @ObservedObject var battery: BatteryMonitor
 
     var body: some View {
@@ -224,7 +170,7 @@ private struct BatteryCard: View {
     }
 }
 
-private struct ClockView: View {
+struct ClockView: View {
     let now: Date
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -242,7 +188,7 @@ private struct ClockView: View {
 
 // MARK: - Media player
 
-private struct MediaSourceBadge: View {
+struct MediaSourceBadge: View {
     let track: NowPlayingController.Track
 
     var body: some View {
@@ -265,7 +211,7 @@ private struct MediaSourceBadge: View {
     }
 }
 
-private struct MediaPlayerView: View {
+struct MediaPlayerView: View {
     @ObservedObject var nowPlaying: NowPlayingController
 
     var body: some View {
@@ -318,7 +264,7 @@ private struct MediaPlayerView: View {
     }
 }
 
-private struct TransportButton: View {
+struct TransportButton: View {
     let system: String
     let size: CGFloat
     var active: Bool = false
@@ -343,7 +289,7 @@ private struct TransportButton: View {
     }
 }
 
-private struct ScrubBar: View {
+struct ScrubBar: View {
     let progress: Double
     let elapsed: TimeInterval
     let duration: TimeInterval
@@ -382,7 +328,7 @@ private struct ScrubBar: View {
     }
 }
 
-private struct ArtworkView: View {
+struct ArtworkView: View {
     let image: NSImage?
     let size: CGFloat
     let corner: CGFloat

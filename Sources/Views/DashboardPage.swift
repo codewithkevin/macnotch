@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// The third pager page: a 2×2 grid of configurable widgets.
-/// Right-click a slot to change what it shows.
+/// The expanded panel: a "home board" showing a now-playing strip plus every
+/// widget at a glance. Tap the media strip or any widget tile to focus it
+/// full-size; a back chevron returns home.
 struct DashboardPage: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var nowPlaying: NowPlayingController
     @ObservedObject var battery: BatteryMonitor
     @StateObject private var store = DashboardStore()
     @StateObject private var weather = WeatherService()
@@ -18,26 +20,33 @@ struct DashboardPage: View {
 
     private var mirrorInUse: Bool { store.slots.contains(.mirror) }
 
+    private enum Focus: Equatable { case home, media, widget(DashboardWidgetKind) }
+    @State private var nav: Focus = .home
     @State private var lastAutoMinute = -1
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
         VStack(spacing: 6) {
-            ProfileBar(profiles: profiles)
-
-            LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(0..<DashboardStore.slotCount, id: \.self) { index in
-                    DashboardSlot(kind: store.slots[index]) { newKind in
-                        store.setSlot(index, to: newKind)
-                        profiles.captureLayout(store.slots)
-                    } content: {
-                        widget(for: store.slots[index])
-                    }
+            switch nav {
+            case .home:
+                homeBoard
+            case .media:
+                detail("Now Playing") { MediaPlayerView(nowPlaying: nowPlaying) }
+            case .widget(let kind):
+                detail(kind.title) {
+                    widget(for: kind)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: nav)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: viewModel.isExpanded) { _, expanded in
+            if !expanded { nav = .home }
+        }
         .onAppear {
             weather.start()
             focus.start()
@@ -72,6 +81,56 @@ struct DashboardPage: View {
                 profiles.activate(target)
             }
         }
+    }
+
+    // MARK: Home board
+
+    private var homeBoard: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                ProfileBar(profiles: profiles)
+            }
+            MediaStrip(nowPlaying: nowPlaying, now: viewModel.now) {
+                nav = .media
+            }
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(0..<DashboardStore.slotCount, id: \.self) { index in
+                    DashboardSlot(
+                        kind: store.slots[index],
+                        onTap: { nav = .widget(store.slots[index]) },
+                        onChange: { newKind in
+                            store.setSlot(index, to: newKind)
+                            profiles.captureLayout(store.slots)
+                        },
+                        content: { widget(for: store.slots[index]) }
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func detail<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Button {
+                    nav = .home
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .padding(4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+                Spacer()
+            }
+            content()
+        }
+        .transition(.opacity)
     }
 
     @ViewBuilder
@@ -135,14 +194,27 @@ private struct ProfileBar: View {
 
 private struct DashboardSlot<Content: View>: View {
     let kind: DashboardWidgetKind
+    let onTap: () -> Void
     let onChange: (DashboardWidgetKind) -> Void
     @ViewBuilder let content: () -> Content
+    @State private var hovering = false
 
     var body: some View {
         content()
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+            .background(.white.opacity(hovering ? 0.1 : 0.06), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(alignment: .topTrailing) {
+                if hovering {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(5)
+                }
+            }
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onTapGesture(perform: onTap)
             .contextMenu {
                 ForEach(DashboardWidgetKind.allCases) { option in
                     Button {
@@ -152,6 +224,63 @@ private struct DashboardSlot<Content: View>: View {
                     }
                 }
             }
+    }
+}
+
+// MARK: - Media strip
+
+private struct MediaStrip: View {
+    @ObservedObject var nowPlaying: NowPlayingController
+    let now: Date
+    let onTap: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let track = nowPlaying.track {
+                ArtworkView(image: track.artwork, size: 34, corner: 7)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(track.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(track.artist)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                EqualizerBars(playing: track.isPlaying,
+                              tint: MediaSource.match(bundleID: track.bundleID)?.tint ?? .white)
+                HStack(spacing: 10) {
+                    Button { nowPlaying.previous() } label: {
+                        Image(systemName: "backward.fill").font(.system(size: 11))
+                    }.buttonStyle(.plain)
+                    Button { nowPlaying.togglePlayPause() } label: {
+                        Image(systemName: track.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 14))
+                    }.buttonStyle(.plain)
+                    Button { nowPlaying.next() } label: {
+                        Image(systemName: "forward.fill").font(.system(size: 11))
+                    }.buttonStyle(.plain)
+                }
+                .foregroundStyle(.white.opacity(0.85))
+            } else {
+                Image(systemName: "music.note").font(.system(size: 13)).foregroundStyle(.white.opacity(0.4))
+                Text("Nothing playing")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
+                Spacer()
+                Text(now, format: .dateTime.hour().minute())
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .monospacedDigit()
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 44)
+        .background(.white.opacity(hovering ? 0.1 : 0.06), in: RoundedRectangle(cornerRadius: 10))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture { if nowPlaying.track != nil { onTap() } }
     }
 }
 
