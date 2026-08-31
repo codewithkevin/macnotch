@@ -4,11 +4,14 @@ import Combine
 
 /// Owns the borderless floating panel anchored under the notch.
 ///
-/// The panel window is a *fixed* size (the expanded bounds) and never resizes —
-/// resizing it while tracking the cursor causes hover flicker. Instead a single
-/// AppKit view (`NotchInteractionView`) owns hover detection and hit-testing:
-/// it only claims mouse events inside the currently-visible panel region and
-/// lets everything else fall through to the apps below.
+/// The panel window is a **fixed** size (the largest state it can reach) and
+/// never resizes. Resizing the window while the cursor is being tracked makes
+/// the tracking-area boundary sweep past the cursor and the panel flickers
+/// open/closed. All visible size changes happen inside SwiftUI instead.
+///
+/// `NotchInteractionView` owns hover detection: one stable tracking area over
+/// the whole window, and a geometric test against the *currently visible*
+/// region so hover only counts over what the user can actually see.
 @MainActor
 final class NotchWindowController {
     private var panel: NotchPanel?
@@ -17,7 +20,6 @@ final class NotchWindowController {
     private let nowPlaying = NowPlayingController()
     private let battery = BatteryMonitor()
     private var cancellables = Set<AnyCancellable>()
-    private var mediaActive = false
 
     func show() {
         let metrics = NotchMetrics.current()
@@ -25,7 +27,7 @@ final class NotchWindowController {
         nowPlaying.start()
         battery.start()
 
-        let panel = NotchPanel(contentRect: metrics.windowFrame(expanded: false))
+        let panel = NotchPanel(contentRect: metrics.windowFrame())
 
         let interaction = NotchInteractionView()
         interaction.frame = panel.contentLayoutRect
@@ -55,45 +57,21 @@ final class NotchWindowController {
         self.panel = panel
         self.interaction = interaction
 
-        viewModel.onExpandedChange = { [weak self] expanded in
-            self?.interaction?.isExpanded = expanded
-            self?.applyFrame(animated: true)
+        viewModel.onExpandedChange = { [weak interaction] expanded in
+            interaction?.isExpanded = expanded
         }
-
-        // Widen the collapsed notch when something is playing so the album art
-        // and visualizer have room beside the physical notch.
         nowPlaying.$track
             .map { $0 != nil }
             .removeDuplicates()
-            .sink { [weak self] active in
-                guard let self else { return }
-                self.mediaActive = active
-                self.interaction?.mediaActive = active
-                self.applyFrame(animated: true)
-            }
+            .sink { [weak interaction] active in interaction?.mediaActive = active }
             .store(in: &cancellables)
-    }
-
-    private func applyFrame(animated: Bool) {
-        let frame = viewModel.metrics.windowFrame(expanded: viewModel.isExpanded,
-                                                  mediaActive: mediaActive)
-        guard let panel, panel.frame != frame else { return }
-        if animated {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.3
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().setFrame(frame, display: true)
-            }
-        } else {
-            panel.setFrame(frame, display: true)
-        }
     }
 
     func reposition() {
         let metrics = NotchMetrics.current()
         viewModel.metrics = metrics
         interaction?.metrics = metrics
-        applyFrame(animated: false)
+        panel?.setFrame(metrics.windowFrame(), display: true, animate: false)
     }
 }
 
@@ -114,6 +92,7 @@ final class NotchPanel: NSPanel {
         ignoresMouseEvents = false
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
+        acceptsMouseMovedEvents = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
     }
 
@@ -121,55 +100,58 @@ final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Transparent AppKit layer that decides which mouse events belong to the notch.
+/// Transparent layer that decides which mouse events belong to the notch.
 ///
-/// * `hitTest` returns `nil` outside the visible panel rect, so clicks and
-///   scrolls elsewhere along the top of the screen pass through untouched.
-/// * A tracking area covering the visible rect drives `onHoverChange`, with a
-///   short exit debounce so brushing the edge doesn't strobe the panel.
+/// One tracking area over the whole (fixed) window; every enter/move/exit is
+/// funnelled through a geometric test against the currently visible region,
+/// with a dwell before opening and a debounce before closing. Because the
+/// window never resizes, that region only *grows* on open (cursor stays inside)
+/// and *shrinks* on close (cursor has already left) — so it can't oscillate.
 final class NotchInteractionView: NSView {
-    var metrics: NotchMetrics? { didSet { refreshTracking() } }
-    var isExpanded = false { didSet { if isExpanded != oldValue { refreshTracking() } } }
-    var mediaActive = false { didSet { if mediaActive != oldValue { refreshTracking() } } }
+    var metrics: NotchMetrics? { didSet { needsDisplay = true } }
+    var isExpanded = false { didSet { if isExpanded != oldValue { evaluate(at: lastPoint) } } }
+    var mediaActive = false
     var onHoverChange: ((Bool) -> Void)?
     var onScroll: ((CGFloat) -> Void)?
 
     private var tracking: NSTrackingArea?
     private var inside = false
+    private var lastPoint: NSPoint = .zero
     private var enterWork: DispatchWorkItem?
     private var exitWork: DispatchWorkItem?
     private var accumulatedScroll: CGFloat = 0
     private let scrollThreshold: CGFloat = 12
-    /// The cursor must dwell this long over the notch before the panel opens,
-    /// so a quick pass across the top of the screen doesn't trigger it.
-    private let openDelay: TimeInterval = 0.16
-    private let closeDelay: TimeInterval = 0.14
+    private let openDelay: TimeInterval = 0.18
+    private let closeDelay: TimeInterval = 0.16
 
     override var isFlipped: Bool { true }
 
-    /// The region that should keep the panel alive, in flipped (top-left) coords.
-    /// Collapsed: just the notch. Expanded: the whole (now panel-sized) window.
-    private var hotRect: NSRect {
-        guard let metrics, !isExpanded else { return bounds }
+    /// The visible region, in flipped (top-left) coords. Collapsed: the notch
+    /// pill (widened by the media chins). Expanded: the whole panel, plus a
+    /// generous margin so small cursor drift near the edge doesn't close it.
+    private var visibleRegion: NSRect {
+        guard let metrics else { return bounds }
+        if isExpanded {
+            return bounds.insetBy(dx: -8, dy: -8)
+        }
         let size = metrics.collapsedSize(mediaActive: mediaActive)
-        return NSRect(x: (bounds.width - size.width) / 2,
+        return NSRect(x: ((bounds.width - size.width) / 2).rounded(),
                       y: 0,
-                      width: size.width,
-                      height: size.height)
+                      width: size.width.rounded(),
+                      height: size.height.rounded())
     }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: hotRect,
-                                  options: [.mouseEnteredAndExited, .activeAlways],
-                                  owner: self,
-                                  userInfo: nil)
+        // Stable: always the full bounds. The window never resizes, so this is
+        // added exactly once per screen configuration.
+        let area = NSTrackingArea(rect: bounds,
+                                  options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways],
+                                  owner: self, userInfo: nil)
         addTrackingArea(area)
         tracking = area
     }
-
-    func refreshTracking() { needsDisplay = true; updateTrackingAreas() }
 
     private func point(from event: NSEvent) -> NSPoint {
         convert(event.locationInWindow, from: nil)
@@ -177,18 +159,22 @@ final class NotchInteractionView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        return hotRect.contains(local) ? super.hitTest(point) : nil
+        return visibleRegion.contains(local) ? super.hitTest(point) : nil
     }
 
-    override func mouseEntered(with event: NSEvent) {
-        // Confirm the pointer is genuinely inside the hot rect.
-        guard hotRect.contains(point(from: event)) else { return }
-        scheduleEnter()
+    override func mouseEntered(with event: NSEvent) { evaluate(at: point(from: event)) }
+    override func mouseMoved(with event: NSEvent) { evaluate(at: point(from: event)) }
+    override func mouseExited(with event: NSEvent) {
+        lastPoint = CGPoint(x: -10_000, y: -10_000)
+        requestClose()
     }
 
-    override func mouseExited(with event: NSEvent) { scheduleExit() }
+    private func evaluate(at p: NSPoint) {
+        lastPoint = p
+        if visibleRegion.contains(p) { requestOpen() } else { requestClose() }
+    }
 
-    private func scheduleEnter() {
+    private func requestOpen() {
         exitWork?.cancel(); exitWork = nil
         guard !inside, enterWork == nil else { return }
         let work = DispatchWorkItem { [weak self] in
@@ -201,10 +187,9 @@ final class NotchInteractionView: NSView {
         DispatchQueue.main.asyncAfter(deadline: .now() + openDelay, execute: work)
     }
 
-    private func scheduleExit() {
+    private func requestClose() {
         enterWork?.cancel(); enterWork = nil
-        exitWork?.cancel()
-        guard inside else { return }
+        guard inside, exitWork == nil else { return }
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.exitWork = nil
@@ -216,7 +201,7 @@ final class NotchInteractionView: NSView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        guard hotRect.contains(point(from: event)) else {
+        guard visibleRegion.contains(point(from: event)) else {
             super.scrollWheel(with: event)
             return
         }

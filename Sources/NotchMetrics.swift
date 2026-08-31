@@ -51,12 +51,13 @@ struct NotchMetrics {
         return CGSize(width: mediaActive ? w + sideChinWidth * 2 : w, height: barHeight)
     }
 
-    /// Window frame (screen coords) centred on the notch, pinned to the top edge.
-    func windowFrame(expanded: Bool, mediaActive: Bool = false) -> NSRect {
+    /// The fixed window frame (screen coords): sized to the largest state the
+    /// panel can reach, centred on the notch and pinned to the top edge. The
+    /// window never changes size — SwiftUI animates the visible content within.
+    func windowFrame() -> NSRect {
         let f = screen.frame
-        let size = expanded ? expandedSize : collapsedSize(mediaActive: mediaActive)
-        let x = f.midX - size.width / 2
-        let y = f.maxY - size.height
-        return NSRect(x: x, y: y, width: size.width, height: size.height)
+        let w = max(expandedSize.width, collapsedSize(mediaActive: true).width)
+        let h = expandedSize.height
+        return NSRect(x: f.midX - w / 2, y: f.maxY - h, width: w, height: h)
     }
 }
