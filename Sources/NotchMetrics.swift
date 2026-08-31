@@ -11,8 +11,9 @@ struct NotchMetrics {
     /// Whether this Mac actually has a notch.
     var isRealNotch: Bool
 
-    /// Expanded panel size when the user hovers.
-    var expandedSize: CGSize { CGSize(width: 780, height: 210) }
+    /// Expanded panel size. One "page" of content is shown at a time and the
+    /// user swipes horizontally between pages, so this stays compact.
+    var expandedSize: CGSize { CGSize(width: 420, height: 200) }
 
     static func current() -> NotchMetrics {
         let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
@@ -36,8 +37,10 @@ struct NotchMetrics {
                             isRealNotch: false)
     }
 
+    /// The exact hover target: the physical notch, only lightly padded so the
+    /// panel doesn't open when the cursor is merely near the top of the screen.
     var collapsedSize: CGSize {
-        CGSize(width: max(notchWidth, 180), height: max(notchHeight, 28))
+        CGSize(width: max(notchWidth, 120), height: max(notchHeight, 26))
     }
 
     /// Window frame (screen coords) centred on the notch, pinned to the top edge.

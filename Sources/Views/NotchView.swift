@@ -103,29 +103,62 @@ private struct ExpandedContent: View {
     @ObservedObject var nowPlaying: NowPlayingController
     @ObservedObject var battery: BatteryMonitor
 
+    @State private var page = 0
+    @GestureState private var drag: CGFloat = 0
+
+    private var pageCount: Int { battery.state != nil ? 3 : 2 }
+
     var body: some View {
-        HStack(spacing: 16) {
-            Group {
-                if nowPlaying.hasMedia {
-                    MediaPlayerView(nowPlaying: nowPlaying)
-                } else {
-                    ClockView(now: viewModel.now)
+        GeometryReader { geo in
+            let w = geo.size.width
+
+            HStack(spacing: 0) {
+                mediaOrClock.frame(width: w)
+                if battery.state != nil {
+                    BatteryCard(battery: battery).frame(width: w)
+                }
+                ShelfView(viewModel: viewModel).frame(width: w)
+            }
+            .offset(x: -CGFloat(page) * w + drag)
+            .frame(width: w, alignment: .leading)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 12)
+                    .updating($drag) { value, state, _ in state = value.translation.width }
+                    .onEnded { value in
+                        let threshold = w / 4
+                        var next = page
+                        if value.translation.width < -threshold { next += 1 }
+                        else if value.translation.width > threshold { next -= 1 }
+                        page = min(max(next, 0), pageCount - 1)
+                    }
+            )
+            .overlay(alignment: .bottom) {
+                if pageCount > 1 {
+                    HStack(spacing: 5) {
+                        ForEach(0..<pageCount, id: \.self) { i in
+                            Circle()
+                                .fill(.white.opacity(i == page ? 0.9 : 0.28))
+                                .frame(width: 5, height: 5)
+                                .onTapGesture { withAnimation(.spring(response: 0.3)) { page = i } }
+                        }
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if battery.state != nil {
-                Divider().overlay(.white.opacity(0.15))
-                BatteryCard(battery: battery)
-                    .frame(width: 92)
-            }
-
-            Divider().overlay(.white.opacity(0.15))
-
-            ShelfView(viewModel: viewModel)
-                .frame(width: 190)
+            .animation(.spring(response: 0.32, dampingFraction: 0.85), value: page)
+            .animation(.interactiveSpring(), value: drag)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .onChange(of: viewModel.isExpanded) { _, expanded in
+            if !expanded { page = 0 }
+        }
+    }
+
+    @ViewBuilder private var mediaOrClock: some View {
+        if nowPlaying.hasMedia {
+            MediaPlayerView(nowPlaying: nowPlaying)
+        } else {
+            ClockView(now: viewModel.now)
+        }
     }
 }
 

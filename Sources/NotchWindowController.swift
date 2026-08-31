@@ -98,25 +98,28 @@ final class NotchPanel: NSPanel {
 /// * A tracking area covering the visible rect drives `onHoverChange`, with a
 ///   short exit debounce so brushing the edge doesn't strobe the panel.
 final class NotchInteractionView: NSView {
-    var metrics: NotchMetrics? { didSet { rebuildTracking() } }
-    var isExpanded = false { didSet { if isExpanded != oldValue { rebuildTracking() } } }
+    var metrics: NotchMetrics? { didSet { refreshTracking() } }
+    var isExpanded = false { didSet { if isExpanded != oldValue { refreshTracking() } } }
     var onHoverChange: ((Bool) -> Void)?
     var onScroll: ((CGFloat) -> Void)?
 
     private var tracking: NSTrackingArea?
     private var inside = false
+    private var enterWork: DispatchWorkItem?
     private var exitWork: DispatchWorkItem?
     private var accumulatedScroll: CGFloat = 0
     private let scrollThreshold: CGFloat = 12
+    /// The cursor must dwell this long over the notch before the panel opens,
+    /// so a quick pass across the top of the screen doesn't trigger it.
+    private let openDelay: TimeInterval = 0.16
+    private let closeDelay: TimeInterval = 0.14
 
     override var isFlipped: Bool { true }
 
-    /// The visible panel rectangle in this view's (flipped, top-left origin) coords.
-    private var panelRect: NSRect {
-        guard let metrics else { return bounds }
-        if isExpanded {
-            return bounds
-        }
+    /// The region that should keep the panel alive, in flipped (top-left) coords.
+    /// Collapsed: just the notch. Expanded: the whole (now panel-sized) window.
+    private var hotRect: NSRect {
+        guard let metrics, !isExpanded else { return bounds }
         let size = metrics.collapsedSize
         return NSRect(x: (bounds.width - size.width) / 2,
                       y: 0,
@@ -124,58 +127,65 @@ final class NotchInteractionView: NSView {
                       height: size.height)
     }
 
-    override func layout() {
-        super.layout()
-        rebuildTracking()
-    }
-
-    private func rebuildTracking() {
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: panelRect,
-                                  options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways],
+        let area = NSTrackingArea(rect: hotRect,
+                                  options: [.mouseEnteredAndExited, .activeAlways],
                                   owner: self,
                                   userInfo: nil)
         addTrackingArea(area)
         tracking = area
     }
 
+    func refreshTracking() { needsDisplay = true; updateTrackingAreas() }
+
     private func point(from event: NSEvent) -> NSPoint {
         convert(event.locationInWindow, from: nil)
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        // `point` is in the superview's coord system (unflipped). Convert.
         let local = convert(point, from: superview)
-        return panelRect.contains(local) ? super.hitTest(point) : nil
+        return hotRect.contains(local) ? super.hitTest(point) : nil
     }
 
-    override func mouseEntered(with event: NSEvent) { enter() }
+    override func mouseEntered(with event: NSEvent) {
+        // Confirm the pointer is genuinely inside the hot rect.
+        guard hotRect.contains(point(from: event)) else { return }
+        scheduleEnter()
+    }
+
     override func mouseExited(with event: NSEvent) { scheduleExit() }
 
-    override func mouseMoved(with event: NSEvent) {
-        if panelRect.contains(point(from: event)) { enter() } else { scheduleExit() }
-    }
-
-    private func enter() {
-        exitWork?.cancel()
-        guard !inside else { return }
-        inside = true
-        onHoverChange?(true)
+    private func scheduleEnter() {
+        exitWork?.cancel(); exitWork = nil
+        guard !inside, enterWork == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.enterWork = nil
+            self.inside = true
+            self.onHoverChange?(true)
+        }
+        enterWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + openDelay, execute: work)
     }
 
     private func scheduleExit() {
+        enterWork?.cancel(); enterWork = nil
         exitWork?.cancel()
+        guard inside else { return }
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            self.exitWork = nil
             self.inside = false
             self.onHoverChange?(false)
         }
         exitWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + closeDelay, execute: work)
     }
 
     override func scrollWheel(with event: NSEvent) {
-        guard panelRect.contains(point(from: event)) else {
+        guard hotRect.contains(point(from: event)) else {
             super.scrollWheel(with: event)
             return
         }
