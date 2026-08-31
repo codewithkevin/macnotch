@@ -14,6 +14,10 @@ Early scaffold / MVP. Working:
 - Borderless floating `NSPanel` anchored under the notch, above full-screen apps
 - Hover to expand / collapse with a spring animation
 - Live clock
+- **System-wide media player** — artwork, title/artist, play/pause, next/previous,
+  and a draggable scrubber for *any* app that reports to macOS Now Playing:
+  Music, Spotify, podcasts, and browser media in Safari / Chrome / Arc / Firefox.
+  Works on macOS 15.4+ / 26 via [`MediaRemoteAdapter`](https://github.com/ejbills/mediaremote-adapter).
 - Drag-and-drop file shelf (drag files in, drag them back out)
 - Status-bar menu to reposition or quit
 
@@ -48,11 +52,20 @@ xcodebuild -project MacNotch.xcodeproj -scheme MacNotch -configuration Debug \
 | `NotchWindowController.swift` | Owns the `NotchPanel` (non-activating, `.statusBar` level, all-spaces) |
 | `NotchMetrics.swift` | Resolves real notch geometry via `safeAreaInsets` / `auxiliaryTopLeftArea`; falls back to a simulated notch |
 | `NotchViewModel.swift` | Observable state: expansion, clock, shelf items |
-| `Views/NotchView.swift` | SwiftUI panel — `NotchShape`, collapsed/expanded content, shelf, drop handling |
+| `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position, exposes transport |
+| `Views/NotchView.swift` | SwiftUI panel — `NotchShape`, collapsed/expanded content, media player, shelf, drop handling |
+
+### Media backend
+
+Apple locked the private `MediaRemote` framework behind an entitlement in
+macOS 15.4. `MediaRemoteAdapter` works around this by loading a helper framework
+inside `/usr/bin/perl` (an Apple-signed binary that *is* entitled) and streaming
+now-playing JSON over stdout. The `MediaRemoteAdapter.framework` is embedded &
+signed into the app bundle automatically by SPM.
 
 ## Roadmap
 
-- [ ] Now-playing media controls (MediaRemote)
+- [ ] Shuffle / repeat toggles, like/ban (already in the adapter API)
 - [ ] Battery / charging indicator
 - [ ] Persist shelf across launches
 - [ ] Per-display notch support / multi-monitor

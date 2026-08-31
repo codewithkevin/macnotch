@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct NotchView: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var nowPlaying: NowPlayingController
 
     private var collapsedWidth: CGFloat { max(viewModel.metrics.notchWidth, 180) }
     private var collapsedHeight: CGFloat { max(viewModel.metrics.notchHeight, 28) }
@@ -16,13 +17,13 @@ struct NotchView: View {
                             radius: 18, y: 8)
 
                 if viewModel.isExpanded {
-                    ExpandedContent(viewModel: viewModel)
+                    ExpandedContent(viewModel: viewModel, nowPlaying: nowPlaying)
                         .padding(.horizontal, 22)
                         .padding(.top, collapsedHeight)
-                        .padding(.bottom, 18)
+                        .padding(.bottom, 16)
                         .transition(.opacity)
                 } else {
-                    CollapsedContent(viewModel: viewModel)
+                    CollapsedContent(viewModel: viewModel, nowPlaying: nowPlaying)
                         .frame(height: collapsedHeight)
                 }
             }
@@ -55,45 +56,209 @@ struct NotchView: View {
     }
 }
 
+// MARK: - Collapsed
+
 private struct CollapsedContent: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var nowPlaying: NowPlayingController
 
     var body: some View {
-        HStack {
-            Image(systemName: "music.note")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.7))
-            Spacer()
+        HStack(spacing: 6) {
+            if let track = nowPlaying.track {
+                ArtworkView(image: track.artwork, size: 18, corner: 4)
+                Image(systemName: track.isPlaying ? "waveform" : "pause.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .symbolEffect(.variableColor.iterative, isActive: track.isPlaying)
+            } else {
+                Image(systemName: "music.note")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            Spacer(minLength: 4)
             Text(viewModel.now, format: .dateTime.hour().minute())
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.7))
+                .monospacedDigit()
         }
         .padding(.horizontal, 14)
     }
 }
 
+// MARK: - Expanded
+
 private struct ExpandedContent: View {
     @ObservedObject var viewModel: NotchViewModel
+    @ObservedObject var nowPlaying: NowPlayingController
 
     var body: some View {
-        HStack(spacing: 20) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(viewModel.now, format: .dateTime.weekday(.wide))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
-                Text(viewModel.now, format: .dateTime.hour().minute().second())
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
+        HStack(spacing: 18) {
+            Group {
+                if nowPlaying.hasMedia {
+                    MediaPlayerView(nowPlaying: nowPlaying)
+                } else {
+                    ClockView(now: viewModel.now)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider().overlay(.white.opacity(0.15))
 
             ShelfView(viewModel: viewModel)
+                .frame(width: 200)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
+
+private struct ClockView: View {
+    let now: Date
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(now, format: .dateTime.weekday(.wide).month().day())
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.6))
+            Text(now, format: .dateTime.hour().minute().second())
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .monospacedDigit()
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
+    }
+}
+
+// MARK: - Media player
+
+private struct MediaPlayerView: View {
+    @ObservedObject var nowPlaying: NowPlayingController
+
+    var body: some View {
+        let track = nowPlaying.track
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                ArtworkView(image: track?.artwork, size: 56, corner: 10)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track?.title ?? "Nothing playing")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(track?.artist ?? "")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                    if let app = track?.appName, !app.isEmpty {
+                        Text(app)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.35))
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 14) {
+                    TransportButton(system: "backward.fill", size: 15) { nowPlaying.previous() }
+                    TransportButton(system: (track?.isPlaying ?? false) ? "pause.fill" : "play.fill",
+                                    size: 20) { nowPlaying.togglePlayPause() }
+                    TransportButton(system: "forward.fill", size: 15) { nowPlaying.next() }
+                }
+            }
+
+            ScrubBar(progress: nowPlaying.progress,
+                     elapsed: nowPlaying.elapsed,
+                     duration: track?.duration ?? 0) { fraction in
+                nowPlaying.seek(toFraction: fraction)
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .center)
+    }
+}
+
+private struct TransportButton: View {
+    let system: String
+    let size: CGFloat
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(.white.opacity(hovering ? 1 : 0.8))
+                .frame(width: size + 12, height: size + 12)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}
+
+private struct ScrubBar: View {
+    let progress: Double
+    let elapsed: TimeInterval
+    let duration: TimeInterval
+    let onSeek: (Double) -> Void
+
+    var body: some View {
+        VStack(spacing: 3) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.15))
+                    Capsule().fill(.white.opacity(0.8))
+                        .frame(width: max(0, min(w, w * progress)))
+                }
+                .frame(height: 4)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onEnded { value in
+                            onSeek(min(max(value.location.x / w, 0), 1))
+                        }
+                )
+            }
+            .frame(height: 12)
+
+            HStack {
+                Text(elapsed.clockString)
+                Spacer()
+                Text(duration > 0 ? duration.clockString : "--:--")
+            }
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.45))
+            .monospacedDigit()
+        }
+    }
+}
+
+private struct ArtworkView: View {
+    let image: NSImage?
+    let size: CGFloat
+    let corner: CGFloat
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                RoundedRectangle(cornerRadius: corner)
+                    .fill(.white.opacity(0.1))
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: size * 0.4))
+                            .foregroundStyle(.white.opacity(0.4))
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: corner))
+    }
+}
+
+// MARK: - Shelf
 
 private struct ShelfView: View {
     @ObservedObject var viewModel: NotchViewModel
@@ -153,6 +318,8 @@ private struct ShelfChip: View {
         .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
     }
 }
+
+// MARK: - Shape
 
 /// A rounded-bottom shape that visually merges with the top edge of the screen.
 struct NotchShape: Shape {

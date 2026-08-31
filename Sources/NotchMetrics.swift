@@ -12,7 +12,7 @@ struct NotchMetrics {
     var isRealNotch: Bool
 
     /// Expanded panel size when the user hovers.
-    var expandedSize: CGSize { CGSize(width: 640, height: 190) }
+    var expandedSize: CGSize { CGSize(width: 680, height: 210) }
 
     static func current() -> NotchMetrics {
         let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })

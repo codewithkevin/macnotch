@@ -6,13 +6,15 @@ import SwiftUI
 final class NotchWindowController {
     private var panel: NotchPanel?
     private let viewModel = NotchViewModel()
+    private let nowPlaying = NowPlayingController()
 
     func show() {
         let metrics = NotchMetrics.current()
         viewModel.metrics = metrics
+        nowPlaying.start()
 
         let panel = NotchPanel(contentRect: metrics.windowFrame())
-        let host = NSHostingView(rootView: NotchView(viewModel: viewModel))
+        let host = NSHostingView(rootView: NotchView(viewModel: viewModel, nowPlaying: nowPlaying))
         host.frame = panel.contentLayoutRect
         host.autoresizingMask = [.width, .height]
         panel.contentView = host

@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
+packages:
+  MediaRemoteAdapter:
+    url: https://github.com/ejbills/mediaremote-adapter.git
+    revision: 5b6afde3f501a3da567e23bf7f23d562938a1809
 settings:
   base:
     MARKETING_VERSION: "0.1.0"
@@ -18,6 +22,11 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+    dependencies:
+      - package: MediaRemoteAdapter
+        product: MediaRemoteAdapter
+        embed: true
+        codeSign: true
     info:
       path: Resources/Info.plist
       properties:
