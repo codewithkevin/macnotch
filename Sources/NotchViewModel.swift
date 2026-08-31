@@ -7,11 +7,14 @@ final class NotchViewModel: ObservableObject {
     @Published var isExpanded: Bool = false
     @Published var now: Date = Date()
     /// File URLs dropped onto the shelf.
-    @Published var shelfItems: [URL] = []
+    @Published var shelfItems: [URL] = [] {
+        didSet { ShelfStore.save(shelfItems) }
+    }
 
     private var timer: AnyCancellable?
 
     init() {
+        shelfItems = ShelfStore.load()
         timer = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] date in self?.now = date }
@@ -27,6 +30,10 @@ final class NotchViewModel: ObservableObject {
         for url in urls where !shelfItems.contains(url) {
             shelfItems.append(url)
         }
+    }
+
+    func removeFromShelf(_ url: URL) {
+        shelfItems.removeAll { $0 == url }
     }
 
     func clearShelf() { shelfItems.removeAll() }

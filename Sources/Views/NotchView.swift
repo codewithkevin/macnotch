@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct NotchView: View {
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject var nowPlaying: NowPlayingController
+    @ObservedObject var battery: BatteryMonitor
 
     private var collapsedWidth: CGFloat { max(viewModel.metrics.notchWidth, 180) }
     private var collapsedHeight: CGFloat { max(viewModel.metrics.notchHeight, 28) }
@@ -17,13 +18,13 @@ struct NotchView: View {
                             radius: 18, y: 8)
 
                 if viewModel.isExpanded {
-                    ExpandedContent(viewModel: viewModel, nowPlaying: nowPlaying)
+                    ExpandedContent(viewModel: viewModel, nowPlaying: nowPlaying, battery: battery)
                         .padding(.horizontal, 22)
                         .padding(.top, collapsedHeight)
                         .padding(.bottom, 16)
                         .transition(.opacity)
                 } else {
-                    CollapsedContent(viewModel: viewModel, nowPlaying: nowPlaying)
+                    CollapsedContent(viewModel: viewModel, nowPlaying: nowPlaying, battery: battery)
                         .frame(height: collapsedHeight)
                 }
             }
@@ -61,6 +62,12 @@ struct NotchView: View {
 private struct CollapsedContent: View {
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject var nowPlaying: NowPlayingController
+    @ObservedObject var battery: BatteryMonitor
+
+    private var showBattery: Bool {
+        guard let s = battery.state else { return false }
+        return s.isCharging || s.isPluggedIn || s.percent <= 20
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -80,6 +87,12 @@ private struct CollapsedContent: View {
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.7))
                 .monospacedDigit()
+            if showBattery, let s = battery.state {
+                Image(systemName: s.symbolName)
+                    .font(.system(size: 11))
+                    .foregroundStyle(s.percent <= 20 && !s.isPluggedIn ? .red : .white.opacity(0.7))
+                    .symbolEffect(.pulse, isActive: battery.justPluggedIn)
+            }
         }
         .padding(.horizontal, 14)
     }
@@ -90,6 +103,7 @@ private struct CollapsedContent: View {
 private struct ExpandedContent: View {
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject var nowPlaying: NowPlayingController
+    @ObservedObject var battery: BatteryMonitor
 
     var body: some View {
         HStack(spacing: 18) {
@@ -97,7 +111,13 @@ private struct ExpandedContent: View {
                 if nowPlaying.hasMedia {
                     MediaPlayerView(nowPlaying: nowPlaying)
                 } else {
-                    ClockView(now: viewModel.now)
+                    HStack(spacing: 22) {
+                        ClockView(now: viewModel.now)
+                        if battery.state != nil {
+                            BatteryCard(battery: battery)
+                        }
+                        Spacer(minLength: 0)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,6 +128,38 @@ private struct ExpandedContent: View {
                 .frame(width: 200)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+}
+
+private struct BatteryCard: View {
+    @ObservedObject var battery: BatteryMonitor
+
+    var body: some View {
+        if let s = battery.state {
+            VStack(alignment: .leading, spacing: 4) {
+                Image(systemName: s.symbolName)
+                    .font(.system(size: 24))
+                    .foregroundStyle(s.isCharging ? .green
+                                     : (s.percent <= 20 ? .red : .white.opacity(0.85)))
+                    .symbolEffect(.pulse, isActive: battery.justPluggedIn)
+                Text("\(s.percent)%")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
+                Text(statusLine(s))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+        }
+    }
+
+    private func statusLine(_ s: BatteryMonitor.State) -> String {
+        if s.isCharged && s.isPluggedIn { return "Charged" }
+        if s.isCharging {
+            return s.timeRemainingString.map { "\($0) to full" } ?? "Charging"
+        }
+        return s.timeRemainingString.map { "\($0) left" } ?? "On battery"
     }
 }
 
@@ -158,11 +210,20 @@ private struct MediaPlayerView: View {
 
                 Spacer(minLength: 8)
 
-                HStack(spacing: 14) {
-                    TransportButton(system: "backward.fill", size: 15) { nowPlaying.previous() }
-                    TransportButton(system: (track?.isPlaying ?? false) ? "pause.fill" : "play.fill",
-                                    size: 20) { nowPlaying.togglePlayPause() }
-                    TransportButton(system: "forward.fill", size: 15) { nowPlaying.next() }
+                VStack(spacing: 6) {
+                    HStack(spacing: 14) {
+                        TransportButton(system: "backward.fill", size: 15) { nowPlaying.previous() }
+                        TransportButton(system: (track?.isPlaying ?? false) ? "pause.fill" : "play.fill",
+                                        size: 20) { nowPlaying.togglePlayPause() }
+                        TransportButton(system: "forward.fill", size: 15) { nowPlaying.next() }
+                    }
+                    HStack(spacing: 16) {
+                        TransportButton(system: "shuffle", size: 11,
+                                        active: nowPlaying.isShuffling) { nowPlaying.toggleShuffle() }
+                        TransportButton(system: nowPlaying.repeatSymbol, size: 11,
+                                        active: nowPlaying.isRepeating) { nowPlaying.cycleRepeat() }
+                        TransportButton(system: "heart", size: 11) { nowPlaying.like() }
+                    }
                 }
             }
 
@@ -179,14 +240,20 @@ private struct MediaPlayerView: View {
 private struct TransportButton: View {
     let system: String
     let size: CGFloat
+    var active: Bool = false
     let action: () -> Void
     @State private var hovering = false
+
+    private var opacity: Double {
+        if active { return 1 }
+        return hovering ? 1 : 0.8
+    }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: system)
                 .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(.white.opacity(hovering ? 1 : 0.8))
+                .foregroundStyle(active ? Color.accentColor : .white.opacity(opacity))
                 .frame(width: size + 12, height: size + 12)
                 .contentShape(Rectangle())
         }
@@ -291,7 +358,7 @@ private struct ShelfView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(viewModel.shelfItems, id: \.self) { url in
-                            ShelfChip(url: url)
+                            ShelfChip(url: url) { viewModel.removeFromShelf(url) }
                         }
                     }
                 }
@@ -303,6 +370,8 @@ private struct ShelfView: View {
 
 private struct ShelfChip: View {
     let url: URL
+    let onRemove: () -> Void
+    @State private var hovering = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -315,6 +384,18 @@ private struct ShelfChip: View {
                 .lineLimit(1)
                 .frame(maxWidth: 60)
         }
+        .overlay(alignment: .topTrailing) {
+            if hovering {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white, .black.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .offset(x: 4, y: -4)
+            }
+        }
+        .onHover { hovering = $0 }
         .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
     }
 }

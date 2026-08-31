@@ -18,7 +18,11 @@ Early scaffold / MVP. Working:
   and a draggable scrubber for *any* app that reports to macOS Now Playing:
   Music, Spotify, podcasts, and browser media in Safari / Chrome / Arc / Firefox.
   Works on macOS 15.4+ / 26 via [`MediaRemoteAdapter`](https://github.com/ejbills/mediaremote-adapter).
-- Drag-and-drop file shelf (drag files in, drag them back out)
+  Shuffle, repeat and like are wired up too.
+- **Battery widget** — glyph in the collapsed bar when charging / plugged in /
+  low, a battery card in the expanded panel, and a pulse when a charger connects.
+- Drag-and-drop file shelf — drag files in, drag them back out, remove with the
+  hover ✕. Contents **persist across launches** via security-scoped bookmarks.
 - Status-bar menu to reposition or quit
 
 ## Requirements
@@ -51,8 +55,10 @@ xcodebuild -project MacNotch.xcodeproj -scheme MacNotch -configuration Debug \
 | `MacNotchApp.swift` | `@main` app + `AppDelegate` (status item, screen-change observers) |
 | `NotchWindowController.swift` | Owns the `NotchPanel` (non-activating, `.statusBar` level, all-spaces) |
 | `NotchMetrics.swift` | Resolves real notch geometry via `safeAreaInsets` / `auxiliaryTopLeftArea`; falls back to a simulated notch |
-| `NotchViewModel.swift` | Observable state: expansion, clock, shelf items |
-| `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position, exposes transport |
+| `NotchViewModel.swift` | Observable state: expansion, clock, shelf items (persisted) |
+| `ShelfStore.swift` | Security-scoped bookmark persistence for the shelf |
+| `System/BatteryMonitor.swift` | IOKit power-source state + charger-connect events |
+| `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position + shuffle/repeat, exposes transport |
 | `Views/NotchView.swift` | SwiftUI panel — `NotchShape`, collapsed/expanded content, media player, shelf, drop handling |
 
 ### Media backend
@@ -65,11 +71,11 @@ signed into the app bundle automatically by SPM.
 
 ## Roadmap
 
-See [TODO.md](TODO.md) for the full working backlog. Near-term:
+See [TODO.md](TODO.md) for the full working backlog.
 
-- [ ] Shuffle / repeat / like controls (already in the adapter API)
-- [ ] Persist shelf across launches
-- [ ] Battery / charging widget
+- [x] Shuffle / repeat / like controls
+- [x] Persist shelf across launches
+- [x] Battery / charging widget
 - [ ] Multi-display / per-notch support
 - [ ] Settings window (hover delay, which widgets, launch at login)
 - [ ] App icon + notarized release, Sparkle auto-update

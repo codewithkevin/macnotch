@@ -30,8 +30,14 @@ final class NowPlayingController: ObservableObject {
     @Published private(set) var track: Track?
     /// Interpolated playback position in seconds.
     @Published private(set) var elapsed: TimeInterval = 0
+    @Published private(set) var shuffle: TrackInfo.ShuffleMode = .off
+    @Published private(set) var repeatMode: TrackInfo.RepeatMode = .off
 
     var hasMedia: Bool { track != nil }
+    var isShuffling: Bool { shuffle != .off }
+    /// SF Symbol for the repeat button + whether it should read as "on".
+    var repeatSymbol: String { repeatMode == .one ? "repeat.1" : "repeat" }
+    var isRepeating: Bool { repeatMode != .off }
     var progress: Double {
         guard let d = track?.duration, d > 0 else { return 0 }
         return min(max(elapsed / d, 0), 1)
@@ -70,6 +76,27 @@ final class NowPlayingController: ObservableObject {
     func next() { controller.nextTrack() }
     func previous() { controller.previousTrack() }
 
+    func toggleShuffle() {
+        // off -> songs -> off
+        let next: TrackInfo.ShuffleMode = shuffle == .off ? .songs : .off
+        shuffle = next
+        controller.setShuffleMode(next)
+    }
+
+    func cycleRepeat() {
+        // off -> all -> one -> off
+        let next: TrackInfo.RepeatMode
+        switch repeatMode {
+        case .off: next = .all
+        case .all: next = .one
+        case .one: next = .off
+        }
+        repeatMode = next
+        controller.setRepeatMode(next)
+    }
+
+    func like() { controller.likeTrack() }
+
     /// Seek to a fraction (0...1) of the current track.
     func seek(toFraction fraction: Double) {
         guard let d = track?.duration, d > 0 else { return }
@@ -99,6 +126,9 @@ final class NowPlayingController: ObservableObject {
             duration: duration,
             artwork: payload.artwork
         )
+
+        if let s = payload.shuffleMode { shuffle = s }
+        if let r = payload.repeatMode { repeatMode = r }
 
         anchorElapsed = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 } ?? 0
         anchorDate = .now

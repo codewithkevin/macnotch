@@ -7,14 +7,18 @@ final class NotchWindowController {
     private var panel: NotchPanel?
     private let viewModel = NotchViewModel()
     private let nowPlaying = NowPlayingController()
+    private let battery = BatteryMonitor()
 
     func show() {
         let metrics = NotchMetrics.current()
         viewModel.metrics = metrics
         nowPlaying.start()
+        battery.start()
 
         let panel = NotchPanel(contentRect: metrics.windowFrame())
-        let host = NSHostingView(rootView: NotchView(viewModel: viewModel, nowPlaying: nowPlaying))
+        let host = NSHostingView(rootView: NotchView(viewModel: viewModel,
+                                                     nowPlaying: nowPlaying,
+                                                     battery: battery))
         host.frame = panel.contentLayoutRect
         host.autoresizingMask = [.width, .height]
         panel.contentView = host

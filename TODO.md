@@ -6,28 +6,31 @@ The README Roadmap is the short version; this file is the working breakdown.
 
 ---
 
-## next
+## done
 
-### 1. Media: shuffle / repeat / like controls
-The adapter already exposes these — just UI + wiring.
-- `NowPlayingController`: publish `shuffleMode` / `repeatMode` from `TrackInfo.payload`; add `toggleShuffle()`, `toggleRepeat()`, `likeTrack()`, `banTrack()` passthroughs.
-- `NotchView` expanded player: add a secondary row of icon buttons (shuffle, repeat, heart) under the transport row.
-- Files: `Sources/Media/NowPlayingController.swift`, `Sources/Views/NotchView.swift`
+### 1. Media: shuffle / repeat / like controls ✅
+`NowPlayingController` publishes `shuffle` / `repeatMode` and exposes
+`toggleShuffle()` / `cycleRepeat()` (off → all → one) / `like()`. Secondary
+button row under the transport controls; active state tinted with the accent
+colour. `Sources/Media/NowPlayingController.swift`, `Sources/Views/NotchView.swift`
 
-### 2. Persist the shelf across launches
-- Store `shelfItems` as security-scoped bookmarks in `UserDefaults` (raw file paths break on sandboxed/relocated files).
-- Restore on `NotchViewModel.init`; drop stale bookmarks that no longer resolve.
-- Files: `Sources/NotchViewModel.swift` (+ new `Sources/ShelfStore.swift`)
+### 2. Persist the shelf across launches ✅
+`ShelfStore` stores minimal bookmarks in `UserDefaults`, refreshes stale ones,
+and drops entries whose file is gone. `NotchViewModel` loads on init and saves
+on every mutation; added `removeFromShelf` + a hover ✕ on each chip.
+`Sources/ShelfStore.swift`, `Sources/NotchViewModel.swift`
 
-### 3. Battery / charging widget
-- `Sources/System/BatteryMonitor.swift`: read `IOPSCopyPowerSourcesInfo` / `IOPSGetProvidingPowerSourceType`, publish `percent`, `isCharging`, `timeRemaining`.
-- Collapsed: show a small battery glyph on the right when charging or < 20%.
-- Expanded: a battery card in the widget area (shares space with clock when no media).
-- Charging animation: brief bolt + fill pulse when a charger connects (observe `IOPSNotificationCreateRunLoopSource`).
+### 3. Battery / charging widget ✅
+`BatteryMonitor` reads IOKit power sources and refreshes via
+`IOPSNotificationCreateRunLoopSource`; publishes percent, charging/plugged/
+charged, and time-to-full/empty. Collapsed shows a glyph when charging,
+plugged, or ≤ 20% (red when low). Expanded shows a battery card beside the
+clock. `justPluggedIn` drives a 2.5s pulse when a charger connects.
+`Sources/System/BatteryMonitor.swift`, `Sources/Views/NotchView.swift`
 
 ---
 
-## soon
+## next
 
 ### 4. Multi-display / per-notch support
 - `NotchMetrics.current()` currently picks the first screen with a notch. Support a panel per screen, or a setting to pick which display.
