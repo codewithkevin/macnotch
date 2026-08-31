@@ -59,13 +59,15 @@ The third pager page becomes a configurable **Dashboard** — a grid of widget
 slots the user arranges, plus a launcher. Big feature; ship in phases. Target
 layout: **4 widget slots** + a launcher strip + a top status row.
 
-### Phase A — frame + first widgets
-- [ ] `DashboardPage` view: 2×2 widget grid (`WidgetSlot` enum, persisted layout in `@AppStorage` / a `DashboardStore`).
-- [ ] `Widget` protocol: `id`, `preferredSize`, `view()`. Registry so Settings can list available widgets.
-- [ ] **Day progress** widget — % of day elapsed, sunrise→sunset bar. (pure date math, no permissions — good first one)
-- [ ] **Quote** widget — rotating quote; bundled JSON list, optional remote refresh.
-- [ ] Keep **Shelf** as one of the widgets (it already exists — wrap `ShelfView`).
-- [ ] **Weather** widget — WeatherKit (needs entitlement + `NSLocation…UsageDescription`) or Open-Meteo (no key, no auth) as the default. Current temp + icon + hi/lo.
+### Phase A — frame + first widgets ✅
+- [x] `DashboardPage` — 2×2 `LazyVGrid`; layout persisted by `DashboardStore` (JSON in UserDefaults). Right-click a slot → context menu to change its widget.
+- [x] `DashboardWidgetKind` enum registry (title + SF Symbol per kind).
+- [x] **Day Progress** widget — % of day elapsed + progress bar (pure date math).
+- [x] **Quote** widget — rotates hourly from a bundled in-source list (`Quotes`).
+- [x] **Shelf** widget — compact wrapper over the existing shelf items/chips.
+- [x] **Weather** widget — `WeatherService`: IP location via ipwho.is + Open-Meteo current/daily (no key, no CoreLocation permission). WMO code → SF Symbol.
+- [x] **Battery** also available as a dashboard widget.
+- follow-ups: `Widget` protocol + Settings-driven registry; CoreLocation for accurate weather; drag-to-reorder slots; 1×1 / 2×1 spans.
 
 ### Phase B — launcher
 - [ ] **App launcher** — scan `/Applications`, `~/Applications`, `/System/Applications`; icon grid with paginated sets. Click to `NSWorkspace.open`.

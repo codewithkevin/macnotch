@@ -13,7 +13,7 @@ struct NotchMetrics {
 
     /// Expanded panel size. One "page" of content is shown at a time and the
     /// user swipes horizontally between pages, so this stays compact.
-    var expandedSize: CGSize { CGSize(width: 420, height: 200) }
+    var expandedSize: CGSize { CGSize(width: 440, height: 244) }
 
     static func current() -> NotchMetrics {
         let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })

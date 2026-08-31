@@ -16,7 +16,10 @@ Early scaffold / MVP. Working:
   or swipe up to collapse. Only the notch itself is a hover target — the rest of
   the top edge stays click-through.
 - Expanded panel is a **horizontal pager**: swipe left/right (or tap the dots)
-  between Now Playing, Battery, and Shelf.
+  between Now Playing, Battery, and the Dashboard.
+- **Dashboard** — a 2×2 grid of configurable widgets (right-click a slot to
+  change it): Day Progress, Quote, Weather (Open-Meteo, no API key), Shelf,
+  Battery. Layout persists.
 - Live clock
 - **System-wide media player** — artwork, title/artist, play/pause, next/previous,
   and a draggable scrubber for *any* app that reports to macOS Now Playing:
@@ -62,6 +65,8 @@ xcodebuild -project MacNotch.xcodeproj -scheme MacNotch -configuration Debug \
 | `NotchViewModel.swift` | Observable state: expansion, clock, shelf items (persisted) |
 | `ShelfStore.swift` | Security-scoped bookmark persistence for the shelf |
 | `System/BatteryMonitor.swift` | IOKit power-source state + charger-connect events |
+| `Dashboard/` | `DashboardStore` (persisted 4-slot layout), `WeatherService` (ipwho.is + Open-Meteo), `Quotes`, `DashboardWidgetKind` |
+| `Views/DashboardPage.swift` | 2×2 widget grid + the individual widget views |
 | `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position + shuffle/repeat, exposes transport |
 | `Views/NotchView.swift` | SwiftUI panel — `NotchShape`, collapsed/expanded content, media player, shelf, drop handling |
 

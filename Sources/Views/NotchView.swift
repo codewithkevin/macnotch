@@ -117,7 +117,7 @@ private struct ExpandedContent: View {
                 if battery.state != nil {
                     BatteryCard(battery: battery).frame(width: w)
                 }
-                ShelfView(viewModel: viewModel).frame(width: w)
+                DashboardPage(viewModel: viewModel, battery: battery).frame(width: w)
             }
             .offset(x: -CGFloat(page) * w + drag)
             .frame(width: w, alignment: .leading)
@@ -358,7 +358,7 @@ private struct ArtworkView: View {
 
 // MARK: - Shelf
 
-private struct ShelfView: View {
+struct ShelfView: View {
     @ObservedObject var viewModel: NotchViewModel
 
     var body: some View {
@@ -399,7 +399,7 @@ private struct ShelfView: View {
     }
 }
 
-private struct ShelfChip: View {
+struct ShelfChip: View {
     let url: URL
     let onRemove: () -> Void
     @State private var hovering = false
