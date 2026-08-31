@@ -20,6 +20,9 @@ final class NotchWindowController {
     private let nowPlaying = NowPlayingController()
     private let battery = BatteryMonitor()
     private var cancellables = Set<AnyCancellable>()
+    /// A dedicated top-level Space that keeps the panel welded to the notch
+    /// through Space-switch animations (collectionBehavior alone lets it slide).
+    private let notchSpace = CGSSpace()
 
     func show() {
         let metrics = NotchMetrics.current()
@@ -54,6 +57,7 @@ final class NotchWindowController {
 
         panel.contentView = interaction
         panel.orderFrontRegardless()
+        notchSpace.windows.insert(panel)
         self.panel = panel
         self.interaction = interaction
 
