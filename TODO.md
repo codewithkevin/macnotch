@@ -69,11 +69,11 @@ layout: **4 widget slots** + a launcher strip + a top status row.
 - [x] **Battery** also available as a dashboard widget.
 - follow-ups: `Widget` protocol + Settings-driven registry; CoreLocation for accurate weather; drag-to-reorder slots; 1×1 / 2×1 spans.
 
-### Phase B — launcher
-- [ ] **App launcher** — scan `/Applications`, `~/Applications`, `/System/Applications`; icon grid with paginated sets. Click to `NSWorkspace.open`.
-- [ ] Config: **extra folders to scan**, and **folder shortcuts** (open in Finder).
-- [ ] Display modes: icon grid / list / paginated sets (setting).
-- [ ] **Actions** row — run **Shortcuts** (`shortcuts run <name>` via `NSUserActivity` / `x-callback` or the Shortcuts CLI); icon or paginated sets. List available shortcuts via the Shortcuts app export or `shortcuts list`.
+### Phase B — launcher ✅
+- [x] **App launcher** widget — `AppScanner` scans `/Applications`(+Utilities), `/System/Applications`(+Utilities), `~/Applications` + extra folders; de-duped, sorted. Paginated icon grid (8/page, swipe), click → `NSWorkspace.open`.
+- [x] **Extra folders to scan** — `LauncherStore` persists them; widget context menu adds (via `NSOpenPanel`) / removes.
+- [x] **Shortcuts** widget — `ShortcutsService` runs `/usr/bin/shortcuts list` / `run <name>` via `Process`; scrollable list, click to run.
+- follow-ups: list display mode for apps (LauncherStore.mode exists, not surfaced); pinned/favourite apps + ordering; folder-shortcut chips (open in Finder — `Launcher.reveal` exists); Actions as icon sets; first-run `shortcuts` permission handling.
 
 ### Phase C — profiles + system
 - [ ] **Profiles** — named sets of dashboard layout + settings. Manual switch from the panel.

@@ -7,6 +7,9 @@ struct DashboardPage: View {
     @ObservedObject var battery: BatteryMonitor
     @StateObject private var store = DashboardStore()
     @StateObject private var weather = WeatherService()
+    @StateObject private var launcherStore = LauncherStore()
+    @StateObject private var appScanner = AppScanner()
+    @StateObject private var shortcuts = ShortcutsService()
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
@@ -21,7 +24,14 @@ struct DashboardPage: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { weather.start() }
+        .onAppear {
+            weather.start()
+            appScanner.rescan(extraFolders: launcherStore.extraFolders)
+            shortcuts.reload()
+        }
+        .onChange(of: launcherStore.extraFolders) { _, folders in
+            appScanner.rescan(extraFolders: folders)
+        }
     }
 
     @ViewBuilder
@@ -32,6 +42,8 @@ struct DashboardPage: View {
         case .weather:     WeatherWidget(weather: weather)
         case .shelf:       ShelfWidget(viewModel: viewModel)
         case .battery:     BatteryWidget(battery: battery)
+        case .appLauncher: AppLauncherWidget(scanner: appScanner, store: launcherStore)
+        case .shortcuts:   ShortcutsWidget(service: shortcuts)
         case .empty:       EmptyView()
         }
     }
@@ -202,5 +214,119 @@ private struct BatteryWidget: View {
                 Text("No battery").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
             }
         }
+    }
+}
+
+// MARK: - Launcher widgets
+
+private struct AppLauncherWidget: View {
+    @ObservedObject var scanner: AppScanner
+    @ObservedObject var store: LauncherStore
+    @State private var page = 0
+
+    private let perPage = 8   // 4 cols × 2 rows
+    private let cols = [GridItem(.adaptive(minimum: 34), spacing: 8)]
+
+    private var pages: [[LaunchItem]] {
+        stride(from: 0, to: scanner.items.count, by: perPage).map {
+            Array(scanner.items[$0..<min($0 + perPage, scanner.items.count)])
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Label("Apps", systemImage: "square.grid.3x3.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                if pages.count > 1 {
+                    Text("\(page + 1)/\(pages.count)")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+            }
+
+            if scanner.items.isEmpty {
+                Spacer(minLength: 0)
+                Text("Scanning…").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+                Spacer(minLength: 0)
+            } else {
+                let safePage = min(page, max(pages.count - 1, 0))
+                LazyVGrid(columns: cols, spacing: 8) {
+                    ForEach(pages.isEmpty ? [] : pages[safePage]) { item in
+                        Button { Launcher.open(item) } label: {
+                            Image(nsImage: item.icon)
+                                .resizable()
+                                .frame(width: 30, height: 30)
+                        }
+                        .buttonStyle(.plain)
+                        .help(item.name)
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 16).onEnded { v in
+                guard pages.count > 1 else { return }
+                if v.translation.width < -20 { page = min(page + 1, pages.count - 1) }
+                else if v.translation.width > 20 { page = max(page - 1, 0) }
+            }
+        )
+        .contextMenu {
+            Button("Add Folder to Scan…") {
+                if let url = Launcher.chooseFolder() { store.addFolder(url) }
+            }
+            if !store.extraFolders.isEmpty {
+                Menu("Remove Scanned Folder") {
+                    ForEach(store.extraFolders, id: \.self) { url in
+                        Button(url.lastPathComponent) { store.removeFolder(url) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ShortcutsWidget: View {
+    @ObservedObject var service: ShortcutsService
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("Shortcuts", systemImage: "bolt.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+
+            if service.names.isEmpty {
+                Spacer(minLength: 0)
+                Text("No shortcuts found").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+                Spacer(minLength: 0)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(service.names, id: \.self) { name in
+                            Button { service.run(name) } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.white.opacity(0.5))
+                                    Text(name)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.white.opacity(0.85))
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

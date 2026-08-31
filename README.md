@@ -19,7 +19,8 @@ Early scaffold / MVP. Working:
   between Now Playing, Battery, and the Dashboard.
 - **Dashboard** — a 2×2 grid of configurable widgets (right-click a slot to
   change it): Day Progress, Quote, Weather (Open-Meteo, no API key), Shelf,
-  Battery. Layout persists.
+  Battery, **App Launcher** (paginated icon grid, scans the standard app
+  folders + any you add), **Shortcuts** (runs macOS Shortcuts). Layout persists.
 - Live clock
 - **System-wide media player** — artwork, title/artist, play/pause, next/previous,
   and a draggable scrubber for *any* app that reports to macOS Now Playing:
@@ -66,6 +67,7 @@ xcodebuild -project MacNotch.xcodeproj -scheme MacNotch -configuration Debug \
 | `ShelfStore.swift` | Security-scoped bookmark persistence for the shelf |
 | `System/BatteryMonitor.swift` | IOKit power-source state + charger-connect events |
 | `Dashboard/` | `DashboardStore` (persisted 4-slot layout), `WeatherService` (ipwho.is + Open-Meteo), `Quotes`, `DashboardWidgetKind` |
+| `Launcher/Launcher.swift` | `AppScanner`, `LauncherStore` (extra folders), `ShortcutsService` (`shortcuts` CLI) |
 | `Views/DashboardPage.swift` | 2×2 widget grid + the individual widget views |
 | `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position + shuffle/repeat, exposes transport |
 | `Views/NotchView.swift` | SwiftUI panel — `NotchShape`, collapsed/expanded content, media player, shelf, drop handling |
