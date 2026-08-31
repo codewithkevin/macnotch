@@ -12,7 +12,8 @@ Inspired by [macnotch.io](https://macnotch.io), NotchNook, and
 Early scaffold / MVP. Working:
 
 - Borderless floating `NSPanel` anchored under the notch, above full-screen apps
-- Hover to expand / collapse with a spring animation
+- **Hover or two-finger-swipe down** to expand; swipe up / move away to collapse.
+  The window resizes to the panel so it never blocks clicks elsewhere up top.
 - Live clock
 - **System-wide media player** — artwork, title/artist, play/pause, next/previous,
   and a draggable scrubber for *any* app that reports to macOS Now Playing:

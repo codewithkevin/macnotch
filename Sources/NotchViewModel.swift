@@ -20,9 +20,23 @@ final class NotchViewModel: ObservableObject {
             .sink { [weak self] date in self?.now = date }
     }
 
+    private var autoCollapse: Task<Void, Never>?
+
     func setExpanded(_ expanded: Bool) {
+        autoCollapse?.cancel()
         withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
             isExpanded = expanded
+        }
+    }
+
+    /// Open via a gesture (scroll), with a fallback that re-collapses if the
+    /// pointer never enters the panel to take over the hover state.
+    func expandFromGesture() {
+        setExpanded(true)
+        autoCollapse = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            self?.setExpanded(false)
         }
     }
 

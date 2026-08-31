@@ -12,7 +12,7 @@ struct NotchMetrics {
     var isRealNotch: Bool
 
     /// Expanded panel size when the user hovers.
-    var expandedSize: CGSize { CGSize(width: 680, height: 210) }
+    var expandedSize: CGSize { CGSize(width: 780, height: 210) }
 
     static func current() -> NotchMetrics {
         let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
@@ -36,11 +36,16 @@ struct NotchMetrics {
                             isRealNotch: false)
     }
 
-    /// Frame (in screen coordinates) for the always-on window that hosts the panel.
-    /// It is sized to the expanded panel and centred on the notch, pinned to the top.
-    func windowFrame() -> NSRect {
+    var collapsedSize: CGSize {
+        CGSize(width: max(notchWidth, 180), height: max(notchHeight, 28))
+    }
+
+    /// Window frame (screen coords) centred on the notch, pinned to the top edge.
+    /// The window is only as large as it needs to be so it doesn't swallow clicks
+    /// or scroll gestures elsewhere along the top of the screen.
+    func windowFrame(expanded: Bool) -> NSRect {
         let f = screen.frame
-        let size = expandedSize
+        let size = expanded ? expandedSize : collapsedSize
         let x = f.midX - size.width / 2
         let y = f.maxY - size.height
         return NSRect(x: x, y: y, width: size.width, height: size.height)

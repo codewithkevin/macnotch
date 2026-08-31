@@ -64,11 +64,6 @@ private struct CollapsedContent: View {
     @ObservedObject var nowPlaying: NowPlayingController
     @ObservedObject var battery: BatteryMonitor
 
-    private var showBattery: Bool {
-        guard let s = battery.state else { return false }
-        return s.isCharging || s.isPluggedIn || s.percent <= 20
-    }
-
     var body: some View {
         HStack(spacing: 6) {
             if let track = nowPlaying.track {
@@ -87,11 +82,16 @@ private struct CollapsedContent: View {
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.7))
                 .monospacedDigit()
-            if showBattery, let s = battery.state {
-                Image(systemName: s.symbolName)
-                    .font(.system(size: 11))
-                    .foregroundStyle(s.percent <= 20 && !s.isPluggedIn ? .red : .white.opacity(0.7))
-                    .symbolEffect(.pulse, isActive: battery.justPluggedIn)
+            if let s = battery.state {
+                HStack(spacing: 3) {
+                    Text("\(s.percent)%")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .monospacedDigit()
+                    Image(systemName: s.symbolName)
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(s.percent <= 20 && !s.isPluggedIn ? .red : .white.opacity(0.7))
+                .symbolEffect(.pulse, isActive: battery.justPluggedIn)
             }
         }
         .padding(.horizontal, 14)
@@ -106,26 +106,26 @@ private struct ExpandedContent: View {
     @ObservedObject var battery: BatteryMonitor
 
     var body: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 16) {
             Group {
                 if nowPlaying.hasMedia {
                     MediaPlayerView(nowPlaying: nowPlaying)
                 } else {
-                    HStack(spacing: 22) {
-                        ClockView(now: viewModel.now)
-                        if battery.state != nil {
-                            BatteryCard(battery: battery)
-                        }
-                        Spacer(minLength: 0)
-                    }
+                    ClockView(now: viewModel.now)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            if battery.state != nil {
+                Divider().overlay(.white.opacity(0.15))
+                BatteryCard(battery: battery)
+                    .frame(width: 92)
+            }
+
             Divider().overlay(.white.opacity(0.15))
 
             ShelfView(viewModel: viewModel)
-                .frame(width: 200)
+                .frame(width: 190)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
