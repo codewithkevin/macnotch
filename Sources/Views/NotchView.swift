@@ -66,10 +66,13 @@ private struct CollapsedContent: View {
         HStack(spacing: 6) {
             if let track = nowPlaying.track {
                 ArtworkView(image: track.artwork, size: 18, corner: 4)
-                Image(systemName: track.isPlaying ? "waveform" : "pause.fill")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.75))
-                    .symbolEffect(.variableColor.iterative, isActive: track.isPlaying)
+                if track.isPlaying {
+                    EqualizerBars(tint: MediaSource.match(bundleID: track.bundleID)?.tint ?? .white)
+                } else {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             } else {
                 Image(systemName: "music.note")
                     .font(.system(size: 11, weight: .semibold))
@@ -93,6 +96,32 @@ private struct CollapsedContent: View {
             }
         }
         .padding(.horizontal, 14)
+    }
+}
+
+/// A small animated equalizer — the "music is playing" indicator on the
+/// collapsed notch. Bars are procedural (MediaRemote doesn't expose levels) and
+/// the timeline pauses itself when the view isn't shown.
+private struct EqualizerBars: View {
+    var tint: Color = .white
+    private let count = 4
+    private let maxHeight: CGFloat = 12
+    private let minHeight: CGFloat = 3
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            HStack(alignment: .center, spacing: 2) {
+                ForEach(0..<count, id: \.self) { i in
+                    let speed = 5.5 + Double(i) * 1.6
+                    let n = sin(t * speed + Double(i) * 1.7) * 0.5 + 0.5
+                    Capsule(style: .continuous)
+                        .fill(tint)
+                        .frame(width: 2.5, height: minHeight + (maxHeight - minHeight) * n)
+                }
+            }
+            .frame(height: maxHeight)
+        }
     }
 }
 
