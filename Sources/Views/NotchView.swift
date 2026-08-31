@@ -65,18 +65,13 @@ private struct CollapsedContent: View {
     var body: some View {
         HStack(spacing: 6) {
             if let track = nowPlaying.track {
-                ArtworkView(image: track.artwork, size: 18, corner: 4)
-                if track.isPlaying {
-                    EqualizerBars(tint: MediaSource.match(bundleID: track.bundleID)?.tint ?? .white)
-                } else {
-                    Image(systemName: "pause.fill")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
+                ArtworkView(image: track.artwork, size: 20, corner: 5)
+                EqualizerBars(playing: track.isPlaying,
+                              tint: MediaSource.match(bundleID: track.bundleID)?.tint ?? .white)
             } else {
                 Image(systemName: "music.note")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.4))
             }
             Spacer(minLength: 4)
             Text(viewModel.now, format: .dateTime.hour().minute())
@@ -84,10 +79,12 @@ private struct CollapsedContent: View {
                 .foregroundStyle(.white.opacity(0.7))
                 .monospacedDigit()
             if let s = battery.state {
-                HStack(spacing: 3) {
-                    Text("\(s.percent)%")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .monospacedDigit()
+                HStack(spacing: 2) {
+                    if nowPlaying.track == nil {
+                        Text("\(s.percent)%")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .monospacedDigit()
+                    }
                     Image(systemName: s.symbolName)
                         .font(.system(size: 11))
                 }
@@ -95,7 +92,7 @@ private struct CollapsedContent: View {
                 .symbolEffect(.pulse, isActive: battery.justPluggedIn)
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
     }
 }
 
@@ -103,24 +100,27 @@ private struct CollapsedContent: View {
 /// collapsed notch. Bars are procedural (MediaRemote doesn't expose levels) and
 /// the timeline pauses itself when the view isn't shown.
 private struct EqualizerBars: View {
+    var playing: Bool
     var tint: Color = .white
     private let count = 4
-    private let maxHeight: CGFloat = 12
+    private let maxHeight: CGFloat = 13
     private let minHeight: CGFloat = 3
 
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !playing)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<count, id: \.self) { i in
                     let speed = 5.5 + Double(i) * 1.6
-                    let n = sin(t * speed + Double(i) * 1.7) * 0.5 + 0.5
+                    let n = playing ? (sin(t * speed + Double(i) * 1.7) * 0.5 + 0.5) : 0.28
                     Capsule(style: .continuous)
                         .fill(tint)
                         .frame(width: 2.5, height: minHeight + (maxHeight - minHeight) * n)
                 }
             }
-            .frame(height: maxHeight)
+            .frame(width: 17, height: maxHeight)
+            .opacity(playing ? 1 : 0.45)
+            .animation(.easeInOut(duration: 0.25), value: playing)
         }
     }
 }

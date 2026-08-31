@@ -1,6 +1,9 @@
 import SwiftUI
 import Combine
+import OSLog
 import MediaRemoteAdapter
+
+private let mlog = Logger(subsystem: "io.macnotch.MacNotch", category: "nowplaying")
 
 /// System-wide now-playing state + transport controls.
 ///
@@ -55,7 +58,11 @@ final class NowPlayingController: ObservableObject {
             Task { @MainActor in self?.ingest(info) }
         }
         controller.onListenerTerminated = { [weak self] in
+            mlog.error("listener terminated; restarting")
             Task { @MainActor in self?.restart() }
+        }
+        controller.onDecodingError = { error, data in
+            mlog.error("decode error: \(error.localizedDescription) raw=\(String(decoding: data, as: UTF8.self).prefix(200))")
         }
     }
 
