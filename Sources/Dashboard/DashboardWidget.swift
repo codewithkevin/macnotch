@@ -11,6 +11,8 @@ enum DashboardWidgetKind: String, Codable, CaseIterable, Identifiable {
     case appLauncher
     case shortcuts
     case quickToggles
+    case events
+    case mirror
     case empty
 
     var id: String { rawValue }
@@ -25,6 +27,8 @@ enum DashboardWidgetKind: String, Codable, CaseIterable, Identifiable {
         case .appLauncher: return "App Launcher"
         case .shortcuts:   return "Shortcuts"
         case .quickToggles: return "Quick Toggles"
+        case .events:      return "Events"
+        case .mirror:      return "Mirror"
         case .empty:       return "Empty"
         }
     }
@@ -39,6 +43,8 @@ enum DashboardWidgetKind: String, Codable, CaseIterable, Identifiable {
         case .appLauncher: return "square.grid.3x3.fill"
         case .shortcuts:   return "bolt.fill"
         case .quickToggles: return "switch.2"
+        case .events:      return "calendar"
+        case .mirror:      return "camera.fill"
         case .empty:       return "square.dashed"
         }
     }

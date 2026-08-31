@@ -13,6 +13,10 @@ struct DashboardPage: View {
     @StateObject private var toggles = SystemToggles()
     @StateObject private var profiles = ProfileStore()
     @StateObject private var focus = FocusMonitor()
+    @StateObject private var calendar = CalendarService()
+    @StateObject private var camera = CameraMirrorController()
+
+    private var mirrorInUse: Bool { store.slots.contains(.mirror) }
 
     @State private var lastAutoMinute = -1
 
@@ -39,8 +43,16 @@ struct DashboardPage: View {
             focus.start()
             appScanner.rescan(extraFolders: launcherStore.extraFolders)
             shortcuts.reload()
+            calendar.start()
             profiles.applyLayout = { store.slots = $0 }
             if let active = profiles.active { store.slots = active.slots }
+            camera.setActive(viewModel.isExpanded && mirrorInUse)
+        }
+        .onChange(of: viewModel.isExpanded) { _, expanded in
+            camera.setActive(expanded && mirrorInUse)
+        }
+        .onChange(of: mirrorInUse) { _, inUse in
+            camera.setActive(viewModel.isExpanded && inUse)
         }
         .onChange(of: launcherStore.extraFolders) { _, folders in
             appScanner.rescan(extraFolders: folders)
@@ -73,6 +85,8 @@ struct DashboardPage: View {
         case .appLauncher: AppLauncherWidget(scanner: appScanner, store: launcherStore)
         case .shortcuts:   ShortcutsWidget(service: shortcuts)
         case .quickToggles: QuickTogglesWidget(toggles: toggles)
+        case .events:      EventsWidget(calendar: calendar)
+        case .mirror:      MirrorWidget(camera: camera)
         case .empty:       EmptyView()
         }
     }
@@ -403,6 +417,70 @@ private struct QuickTogglesWidget: View {
             }
             .buttonStyle(.plain)
         }
+    }
+}
+
+private struct EventsWidget: View {
+    @ObservedObject var calendar: CalendarService
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label("Next", systemImage: "calendar")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+
+            if calendar.access == .denied {
+                Spacer(minLength: 0)
+                Text("Calendar access off").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+                Spacer(minLength: 0)
+            } else if calendar.events.isEmpty {
+                Spacer(minLength: 0)
+                Text("Nothing scheduled").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+                Spacer(minLength: 0)
+            } else {
+                ForEach(calendar.events) { event in
+                    HStack(spacing: 5) {
+                        Circle().fill(event.color).frame(width: 5, height: 5)
+                        Text(event.title)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text(event.isAllDay ? "all day"
+                             : event.start.formatted(date: .omitted, time: .shortened))
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.45))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct MirrorWidget: View {
+    @ObservedObject var camera: CameraMirrorController
+
+    var body: some View {
+        ZStack {
+            switch camera.state {
+            case .running:
+                CameraPreview(session: camera.session)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            case .denied:
+                VStack(spacing: 4) {
+                    Image(systemName: "video.slash").font(.system(size: 16))
+                    Text("Camera access off").font(.system(size: 9))
+                }
+                .foregroundStyle(.white.opacity(0.4))
+            case .idle:
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

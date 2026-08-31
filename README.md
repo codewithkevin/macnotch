@@ -21,7 +21,8 @@ Early scaffold / MVP. Working:
   change it): Day Progress, Quote, Weather (Open-Meteo, no API key), Shelf,
   Battery, **App Launcher** (paginated icon grid, scans the standard app
   folders + any you add), **Shortcuts** (runs macOS Shortcuts), **Quick Toggles**
-  (Dark Mode, Keep Awake, Launch at Login). Layout persists.
+  (Dark Mode, Keep Awake, Launch at Login), **Events** (EventKit), **Mirror**
+  (front-camera preview, only runs while the panel is open). Layout persists.
 - **Profiles** — named dashboard layouts, switched from the bar at the top of
   the dashboard, or automatically by time-of-day schedule / active macOS Focus
   (best effort) when auto-switch is on.
@@ -30,7 +31,8 @@ Early scaffold / MVP. Working:
   and a draggable scrubber for *any* app that reports to macOS Now Playing:
   Music, Spotify, podcasts, and browser media in Safari / Chrome / Arc / Firefox.
   Works on macOS 15.4+ / 26 via [`MediaRemoteAdapter`](https://github.com/ejbills/mediaremote-adapter).
-  Shuffle, repeat and like are wired up too.
+  Shuffle, repeat and like are wired up too, and the panel shows a tinted
+  **source badge** (Spotify / Apple Music / Plex / NetEase / VLC / browser).
 - **Battery widget** — glyph in the collapsed bar when charging / plugged in /
   low, a battery card in the expanded panel, and a pulse when a charger connects.
 - Drag-and-drop file shelf — drag files in, drag them back out, remove with the
@@ -73,6 +75,9 @@ xcodebuild -project MacNotch.xcodeproj -scheme MacNotch -configuration Debug \
 | `Dashboard/` | `DashboardStore` (persisted 4-slot layout), `WeatherService` (ipwho.is + Open-Meteo), `Quotes`, `DashboardWidgetKind` |
 | `Launcher/Launcher.swift` | `AppScanner`, `LauncherStore` (extra folders), `ShortcutsService` (`shortcuts` CLI) |
 | `Dashboard/Profiles.swift` | `Profile` + `ProfileStore` (named layouts, schedule), `FocusMonitor` (best-effort Focus read) |
+| `Dashboard/CalendarService.swift` | EventKit — upcoming events |
+| `Media/MediaSource.swift` | known-player bundle-id → name / tint / icon / install check |
+| `Views/CameraMirror.swift` | `AVCaptureSession` controller + `AVCaptureVideoPreviewLayer` wrapper |
 | `System/SystemToggles.swift` | Dark Mode / Keep Awake (IOPM assertion) / Launch at Login (`SMAppService`) |
 | `Views/DashboardPage.swift` | 2×2 widget grid + the individual widget views |
 | `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position + shuffle/repeat, exposes transport |

@@ -22,6 +22,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>MacNotch shows your upcoming events in the notch panel.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>MacNotch shows your upcoming events in the notch panel.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MacNotch shows a camera mirror in the notch panel.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026. All rights reserved.</string>
 </dict>

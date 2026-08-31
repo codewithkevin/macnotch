@@ -212,6 +212,29 @@ private struct ClockView: View {
 
 // MARK: - Media player
 
+private struct MediaSourceBadge: View {
+    let track: NowPlayingController.Track
+
+    var body: some View {
+        let source = MediaSource.match(bundleID: track.bundleID)
+        HStack(spacing: 4) {
+            if let icon = source?.icon {
+                Image(nsImage: icon).resizable().frame(width: 12, height: 12)
+            } else {
+                Image(systemName: source?.fallbackSymbol ?? "app.dashed")
+                    .font(.system(size: 9))
+            }
+            Text(source?.name ?? track.appName)
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle((source?.tint ?? .white).opacity(0.9))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background((source?.tint ?? .white).opacity(0.14), in: Capsule())
+    }
+}
+
 private struct MediaPlayerView: View {
     @ObservedObject var nowPlaying: NowPlayingController
 
@@ -231,11 +254,8 @@ private struct MediaPlayerView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
-                    if let app = track?.appName, !app.isEmpty {
-                        Text(app)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.35))
-                            .lineLimit(1)
+                    if let track, !track.appName.isEmpty {
+                        MediaSourceBadge(track: track)
                     }
                 }
 

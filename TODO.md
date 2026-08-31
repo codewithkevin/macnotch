@@ -84,10 +84,11 @@ layout: **4 widget slots** + a launcher strip + a top status row.
 - ❌ **Screen Time** widget — dropped: no public API; `knowledgeC.db` is TCC-protected and unstable.
 - follow-ups: profile editor UI (create/rename/delete, set schedule + Focus mapping — currently only editable in code/JSON); status-bar menu profile switcher; Wi-Fi toggle via `networksetup` (best effort).
 
-### Phase D — media cards + mirror + events
-- [ ] Media **source cards** — beyond the current unified Now Playing: detect installed players (Spotify, Apple Music, **Plex**, **NetEase Cloud Music**, **VLC**) and show a per-app card when that app is the Now Playing source. Bundle-id detection for install state.
-- [ ] **Mirror** widget — front-camera preview (`AVCaptureSession`), needs `NSCameraUsageDescription`. Also useful on hover (already noted in §7).
-- [ ] **Shortcuts & events** widget — next calendar events (EventKit) + pinned shortcuts in one card.
+### Phase D — media cards + mirror + events ✅
+- [x] Media **source badge** — `MediaSource` maps known bundle IDs (Spotify, Apple Music, Plex, NetEase, VLC, Safari/Chrome/Arc/Firefox) to a name + accent + icon. Now Playing panel shows a tinted source chip; `Track` carries `bundleID`. `MediaSource.installed` lists which players are present.
+- [x] **Mirror** widget — `CameraMirrorController` (`AVCaptureSession`, front camera, mirrored preview). Runs only while the panel is open *and* a slot uses it; `NSCameraUsageDescription` added.
+- [x] **Events** widget — `CalendarService` (EventKit, full-access request); next 4 events over 48h with per-calendar colour. `NSCalendars*UsageDescription` added.
+- follow-ups: dedicated media *cards* per source (bigger than the chip); pinned shortcuts alongside events; mirror flip / zoom controls.
 
 ### Open questions
 - Widget slot sizing: fixed 2×2, or allow 1×1 / 2×1 / 2×2 spans? (macnotch.io uses spans.)

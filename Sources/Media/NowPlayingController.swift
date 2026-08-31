@@ -16,6 +16,7 @@ final class NowPlayingController: ObservableObject {
         var artist: String
         var album: String
         var appName: String
+        var bundleID: String
         var isPlaying: Bool
         var duration: TimeInterval          // seconds, 0 if unknown
         var artwork: NSImage?
@@ -122,6 +123,7 @@ final class NowPlayingController: ObservableObject {
             artist: payload.artist ?? "",
             album: payload.album ?? "",
             appName: payload.applicationName ?? "",
+            bundleID: payload.bundleIdentifier ?? "",
             isPlaying: payload.isPlaying ?? false,
             duration: duration,
             artwork: payload.artwork

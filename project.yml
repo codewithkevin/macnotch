@@ -36,6 +36,9 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSUIElement: true
         NSHumanReadableCopyright: "Copyright © 2026. All rights reserved."
+        NSCameraUsageDescription: "MacNotch shows a camera mirror in the notch panel."
+        NSCalendarsUsageDescription: "MacNotch shows your upcoming events in the notch panel."
+        NSCalendarsFullAccessUsageDescription: "MacNotch shows your upcoming events in the notch panel."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.macnotch.MacNotch
