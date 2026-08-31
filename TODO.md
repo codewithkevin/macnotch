@@ -75,13 +75,14 @@ layout: **4 widget slots** + a launcher strip + a top status row.
 - [x] **Shortcuts** widget — `ShortcutsService` runs `/usr/bin/shortcuts list` / `run <name>` via `Process`; scrollable list, click to run.
 - follow-ups: list display mode for apps (LauncherStore.mode exists, not surfaced); pinned/favourite apps + ordering; folder-shortcut chips (open in Finder — `Launcher.reveal` exists); Actions as icon sets; first-run `shortcuts` permission handling.
 
-### Phase C — profiles + system
-- [ ] **Profiles** — named sets of dashboard layout + settings. Manual switch from the panel.
-- [ ] **Focus-based switching** — observe the current Focus (`INFocusStatusCenter` / the Focus filter API is limited; may need the DND defaults / `com.apple.donotdisturb` or a Focus filter extension) and switch profile.
-- [ ] **Time-based switching** — schedule rules (e.g. Work 9–18 Mon–Fri).
-- [ ] **Quick toggles** widget — Dark Mode, Do Not Disturb, True Tone, Night Shift, AirDrop, Bluetooth, Wi-Fi. Some need private APIs / `osascript` / `shortcuts`; scope to what's reliably scriptable.
-- [ ] **Persist Never Sleep** toggle (wraps `caffeinate` / `IOPMAssertionCreateWithName`) with an option to **Launch at Login** (`SMAppService`).
-- [ ] **Screen Time** widget — usage today. (Screen Time data is sandboxed / no public API — investigate `knowledgeC.db` read feasibility or drop.)
+### Phase C — profiles + system ✅ (partial, by design)
+- [x] **Profiles** — `ProfileStore`: named layouts (`Profile` = name + slots + optional focusName + schedule), persisted. Switch from the `ProfileBar` menu on the dashboard. Editing a slot writes back to the active profile. Seeds "Default" + a scheduled "Work" profile.
+- [x] **Time-based switching** — `Profile.Schedule` (weekday set + start/end minute, wraps midnight); checked once a minute when auto-switch is on.
+- [x] **Focus-based switching** — `FocusMonitor` polls `~/Library/DoNotDisturb/DB/Assertions.json` (best effort; no public API). Focus match beats schedule match.
+- [x] **Quick Toggles** widget — Dark Mode (`osascript`), Keep Awake (`IOPMAssertionCreateWithName`), Launch at Login (`SMAppService`). Reliable, no private APIs.
+- ❌ Night Shift / True Tone / AirDrop / Bluetooth / DND toggles — dropped: all need private frameworks or extra binaries. Revisit if we ship a helper.
+- ❌ **Screen Time** widget — dropped: no public API; `knowledgeC.db` is TCC-protected and unstable.
+- follow-ups: profile editor UI (create/rename/delete, set schedule + Focus mapping — currently only editable in code/JSON); status-bar menu profile switcher; Wi-Fi toggle via `networksetup` (best effort).
 
 ### Phase D — media cards + mirror + events
 - [ ] Media **source cards** — beyond the current unified Now Playing: detect installed players (Spotify, Apple Music, **Plex**, **NetEase Cloud Music**, **VLC**) and show a per-app card when that app is the Now Playing source. Bundle-id detection for install state.

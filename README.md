@@ -20,7 +20,11 @@ Early scaffold / MVP. Working:
 - **Dashboard** — a 2×2 grid of configurable widgets (right-click a slot to
   change it): Day Progress, Quote, Weather (Open-Meteo, no API key), Shelf,
   Battery, **App Launcher** (paginated icon grid, scans the standard app
-  folders + any you add), **Shortcuts** (runs macOS Shortcuts). Layout persists.
+  folders + any you add), **Shortcuts** (runs macOS Shortcuts), **Quick Toggles**
+  (Dark Mode, Keep Awake, Launch at Login). Layout persists.
+- **Profiles** — named dashboard layouts, switched from the bar at the top of
+  the dashboard, or automatically by time-of-day schedule / active macOS Focus
+  (best effort) when auto-switch is on.
 - Live clock
 - **System-wide media player** — artwork, title/artist, play/pause, next/previous,
   and a draggable scrubber for *any* app that reports to macOS Now Playing:
@@ -68,6 +72,8 @@ xcodebuild -project MacNotch.xcodeproj -scheme MacNotch -configuration Debug \
 | `System/BatteryMonitor.swift` | IOKit power-source state + charger-connect events |
 | `Dashboard/` | `DashboardStore` (persisted 4-slot layout), `WeatherService` (ipwho.is + Open-Meteo), `Quotes`, `DashboardWidgetKind` |
 | `Launcher/Launcher.swift` | `AppScanner`, `LauncherStore` (extra folders), `ShortcutsService` (`shortcuts` CLI) |
+| `Dashboard/Profiles.swift` | `Profile` + `ProfileStore` (named layouts, schedule), `FocusMonitor` (best-effort Focus read) |
+| `System/SystemToggles.swift` | Dark Mode / Keep Awake (IOPM assertion) / Launch at Login (`SMAppService`) |
 | `Views/DashboardPage.swift` | 2×2 widget grid + the individual widget views |
 | `Media/NowPlayingController.swift` | Wraps `MediaRemoteAdapter`; publishes track + interpolated position + shuffle/repeat, exposes transport |
 | `Views/NotchView.swift` | SwiftUI panel — `NotchShape`, collapsed/expanded content, media player, shelf, drop handling |

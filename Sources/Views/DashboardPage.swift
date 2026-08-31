@@ -10,27 +10,55 @@ struct DashboardPage: View {
     @StateObject private var launcherStore = LauncherStore()
     @StateObject private var appScanner = AppScanner()
     @StateObject private var shortcuts = ShortcutsService()
+    @StateObject private var toggles = SystemToggles()
+    @StateObject private var profiles = ProfileStore()
+    @StateObject private var focus = FocusMonitor()
+
+    @State private var lastAutoMinute = -1
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(0..<DashboardStore.slotCount, id: \.self) { index in
-                DashboardSlot(kind: store.slots[index]) { newKind in
-                    store.setSlot(index, to: newKind)
-                } content: {
-                    widget(for: store.slots[index])
+        VStack(spacing: 6) {
+            ProfileBar(profiles: profiles)
+
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(0..<DashboardStore.slotCount, id: \.self) { index in
+                    DashboardSlot(kind: store.slots[index]) { newKind in
+                        store.setSlot(index, to: newKind)
+                        profiles.captureLayout(store.slots)
+                    } content: {
+                        widget(for: store.slots[index])
+                    }
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             weather.start()
+            focus.start()
             appScanner.rescan(extraFolders: launcherStore.extraFolders)
             shortcuts.reload()
+            profiles.applyLayout = { store.slots = $0 }
+            if let active = profiles.active { store.slots = active.slots }
         }
         .onChange(of: launcherStore.extraFolders) { _, folders in
             appScanner.rescan(extraFolders: folders)
+        }
+        .onChange(of: viewModel.now) { _, now in
+            let minute = Calendar.current.component(.minute, from: now)
+            guard minute != lastAutoMinute else { return }
+            lastAutoMinute = minute
+            if let target = profiles.resolveAutomatic(now: now, focus: focus.current),
+               target.id != profiles.activeID {
+                profiles.activate(target)
+            }
+        }
+        .onChange(of: focus.current) { _, f in
+            if let target = profiles.resolveAutomatic(now: .now, focus: f),
+               target.id != profiles.activeID {
+                profiles.activate(target)
+            }
         }
     }
 
@@ -44,8 +72,48 @@ struct DashboardPage: View {
         case .battery:     BatteryWidget(battery: battery)
         case .appLauncher: AppLauncherWidget(scanner: appScanner, store: launcherStore)
         case .shortcuts:   ShortcutsWidget(service: shortcuts)
+        case .quickToggles: QuickTogglesWidget(toggles: toggles)
         case .empty:       EmptyView()
         }
+    }
+}
+
+// MARK: - Profile bar
+
+private struct ProfileBar: View {
+    @ObservedObject var profiles: ProfileStore
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Menu {
+                ForEach(profiles.profiles) { profile in
+                    Button {
+                        profiles.activate(profile)
+                    } label: {
+                        Label(profile.name, systemImage: profile.id == profiles.activeID ? "checkmark" : "")
+                    }
+                }
+                Divider()
+                Toggle("Auto-switch (Focus / schedule)", isOn: $profiles.autoSwitch)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.crop.rectangle.stack")
+                        .font(.system(size: 9))
+                    Text(profiles.active?.name ?? "No profile")
+                        .font(.system(size: 10, weight: .semibold))
+                    if profiles.autoSwitch {
+                        Image(systemName: "clock").font(.system(size: 8))
+                    }
+                }
+                .foregroundStyle(.white.opacity(0.7))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+
+            Spacer()
+        }
+        .padding(.horizontal, 2)
     }
 }
 
@@ -287,6 +355,53 @@ private struct AppLauncherWidget: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct QuickTogglesWidget: View {
+    @ObservedObject var toggles: SystemToggles
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Toggles", systemImage: "switch.2")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+
+            HStack(spacing: 8) {
+                ToggleButton(system: "moon.fill", label: "Dark",
+                             on: toggles.isDarkMode) { toggles.toggleDarkMode() }
+                ToggleButton(system: "cup.and.saucer.fill", label: "Awake",
+                             on: toggles.keepAwake) { toggles.toggleKeepAwake() }
+                ToggleButton(system: "power", label: "Login",
+                             on: toggles.launchAtLogin) { toggles.toggleLaunchAtLogin() }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private struct ToggleButton: View {
+        let system: String
+        let label: String
+        let on: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 3) {
+                    Image(systemName: system)
+                        .font(.system(size: 14))
+                        .frame(width: 30, height: 30)
+                        .background(on ? Color.accentColor : Color.white.opacity(0.1),
+                                    in: RoundedRectangle(cornerRadius: 8))
+                    Text(label)
+                        .font(.system(size: 8))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .foregroundStyle(on ? .white : .white.opacity(0.7))
+            }
+            .buttonStyle(.plain)
         }
     }
 }
