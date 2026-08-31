@@ -65,11 +65,13 @@ signed into the app bundle automatically by SPM.
 
 ## Roadmap
 
-- [ ] Shuffle / repeat toggles, like/ban (already in the adapter API)
-- [ ] Battery / charging indicator
+See [TODO.md](TODO.md) for the full working backlog. Near-term:
+
+- [ ] Shuffle / repeat / like controls (already in the adapter API)
 - [ ] Persist shelf across launches
-- [ ] Per-display notch support / multi-monitor
-- [ ] Settings window (hover delay, which widgets)
+- [ ] Battery / charging widget
+- [ ] Multi-display / per-notch support
+- [ ] Settings window (hover delay, which widgets, launch at login)
 - [ ] App icon + notarized release, Sparkle auto-update
 
 ## License
