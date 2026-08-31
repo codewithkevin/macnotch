@@ -46,10 +46,49 @@ clock. `justPluggedIn` drives a 2.5s pulse when a charger connects.
 - Persist via `@AppStorage`.
 
 ### 6. Notch interaction polish
-- Small open/close delay so a mouse passing over the notch doesn't trigger it.
+- ~~Small open/close delay so a mouse passing over the notch doesn't trigger it.~~ ✅ (dwell + confirm)
 - Optional "click to pin open".
 - Haptic feedback on expand (`NSHapticFeedbackManager`).
 - Match the hardware notch corner radius more precisely; blur/vibrancy behind the panel.
+
+---
+
+## Dashboard epic (replaces / absorbs the "Shelf" page)
+
+The third pager page becomes a configurable **Dashboard** — a grid of widget
+slots the user arranges, plus a launcher. Big feature; ship in phases. Target
+layout: **4 widget slots** + a launcher strip + a top status row.
+
+### Phase A — frame + first widgets
+- [ ] `DashboardPage` view: 2×2 widget grid (`WidgetSlot` enum, persisted layout in `@AppStorage` / a `DashboardStore`).
+- [ ] `Widget` protocol: `id`, `preferredSize`, `view()`. Registry so Settings can list available widgets.
+- [ ] **Day progress** widget — % of day elapsed, sunrise→sunset bar. (pure date math, no permissions — good first one)
+- [ ] **Quote** widget — rotating quote; bundled JSON list, optional remote refresh.
+- [ ] Keep **Shelf** as one of the widgets (it already exists — wrap `ShelfView`).
+- [ ] **Weather** widget — WeatherKit (needs entitlement + `NSLocation…UsageDescription`) or Open-Meteo (no key, no auth) as the default. Current temp + icon + hi/lo.
+
+### Phase B — launcher
+- [ ] **App launcher** — scan `/Applications`, `~/Applications`, `/System/Applications`; icon grid with paginated sets. Click to `NSWorkspace.open`.
+- [ ] Config: **extra folders to scan**, and **folder shortcuts** (open in Finder).
+- [ ] Display modes: icon grid / list / paginated sets (setting).
+- [ ] **Actions** row — run **Shortcuts** (`shortcuts run <name>` via `NSUserActivity` / `x-callback` or the Shortcuts CLI); icon or paginated sets. List available shortcuts via the Shortcuts app export or `shortcuts list`.
+
+### Phase C — profiles + system
+- [ ] **Profiles** — named sets of dashboard layout + settings. Manual switch from the panel.
+- [ ] **Focus-based switching** — observe the current Focus (`INFocusStatusCenter` / the Focus filter API is limited; may need the DND defaults / `com.apple.donotdisturb` or a Focus filter extension) and switch profile.
+- [ ] **Time-based switching** — schedule rules (e.g. Work 9–18 Mon–Fri).
+- [ ] **Quick toggles** widget — Dark Mode, Do Not Disturb, True Tone, Night Shift, AirDrop, Bluetooth, Wi-Fi. Some need private APIs / `osascript` / `shortcuts`; scope to what's reliably scriptable.
+- [ ] **Persist Never Sleep** toggle (wraps `caffeinate` / `IOPMAssertionCreateWithName`) with an option to **Launch at Login** (`SMAppService`).
+- [ ] **Screen Time** widget — usage today. (Screen Time data is sandboxed / no public API — investigate `knowledgeC.db` read feasibility or drop.)
+
+### Phase D — media cards + mirror + events
+- [ ] Media **source cards** — beyond the current unified Now Playing: detect installed players (Spotify, Apple Music, **Plex**, **NetEase Cloud Music**, **VLC**) and show a per-app card when that app is the Now Playing source. Bundle-id detection for install state.
+- [ ] **Mirror** widget — front-camera preview (`AVCaptureSession`), needs `NSCameraUsageDescription`. Also useful on hover (already noted in §7).
+- [ ] **Shortcuts & events** widget — next calendar events (EventKit) + pinned shortcuts in one card.
+
+### Open questions
+- Widget slot sizing: fixed 2×2, or allow 1×1 / 2×1 / 2×2 spans? (macnotch.io uses spans.)
+- How much of this is worth doing vs. deferring — a lot of the system toggles fight the sandbox / private APIs.
 
 ---
 
