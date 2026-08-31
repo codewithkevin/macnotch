@@ -1,0 +1,35 @@
+name: MacNotch
+options:
+  bundleIdPrefix: io.macnotch
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+targets:
+  MacNotch:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleName: MacNotch
+        CFBundleDisplayName: MacNotch
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSUIElement: true
+        NSHumanReadableCopyright: "Copyright © 2026. All rights reserved."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.macnotch.MacNotch
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
